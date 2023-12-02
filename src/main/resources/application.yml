@@ -1,0 +1,13 @@
+
+spring:
+  r2dbc:
+    url: r2dbc:pool:mysql://localhost:3306/streamtest
+    username: root
+    password: uioprewq
+    #    pool:
+    #      initial-size: connection_pool_initial_size
+    #      max-size: connection_pool_max_size
+# ?? ?? - R2DBC?? Database? ??? ??? ?? ??? ???? ????? ???? ?
+logging:
+  level:
+    org.springframework.r2dbc.core: debug

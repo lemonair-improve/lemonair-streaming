@@ -1,0 +1,13 @@
+이 코드는 Spring 프레임워크에서 사용되는 Java 기반의 설정 클래스인 HandlerConfig를 정의하고 있습니다. 이 클래스는 다양한 빈(Bean)을 생성하여 의존성 주입을 관리하고 있습니다. 아래는 코드의 각 부분에 대한 설명입니다:
+
+WebClient 빈: 웹 클라이언트를 생성하기 위한 빈을 정의하고 있습니다. 이는 Reactive 웹 요청을 보낼 때 사용될 수 있습니다.
+
+StreamContext 빈: StreamContext 클래스의 인스턴스를 생성하는 빈입니다. 이는 스트리밍 컨텍스트를 관리하는 클래스로 보입니다.
+
+ChunkDecoder, ChunkEncoder, HandshakeHandler, InboundConnectionLogger, RtmpMessageHandler 빈들: 각각 다양한 기능을 담당하는 클래스들의 인스턴스를 생성하는 빈들입니다. 이들은 모두 prototype 스코프로 정의되어 있어서 각각의 요청에 대해 새로운 인스턴스가 생성됩니다.
+
+RtmpServer 빈: RtmpServer 클래스의 인스턴스를 생성하는 빈입니다. 이 클래스는 프로토콜에 따라 RTMP(Real-Time Messaging Protocol) 서버를 구현하며, 여러 의존성들을 주입받아 초기화합니다. 이를 통해 각 의존성이 prototype 스코프인 빈들을 생성하여 사용하게 됩니다.
+
+@Scope(value = "prototype"): 해당 어노테이션은 빈의 스코프를 지정하는데 사용됩니다. 여기서는 prototype으로 설정되어 있어서 매번 빈이 요청될 때마다 새로운 인스턴스가 생성됩니다.
+
+코드를 보면 RtmpServer 빈에서 다양한 의존성들을 생성할 때, 각각 @Scope(value = "prototype")로 정의된 빈들을 주입받아 새로운 인스턴스를 생성하고 있습니다. 이를 통해 싱글톤 빈인 RtmpServer가 여러 요청에 대해 안전하게 처리될 수 있습니다.
