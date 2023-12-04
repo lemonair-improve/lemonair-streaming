@@ -67,6 +67,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 		runWithOutAuthTranscodingException(args);
 	}
 
+	// auth, transcoding 서버 통신간 예외처리 등 복잡한 로직 제외한 서버 build 코드
 	private void runWithOutAuthTranscodingException(String... args) {
 		DisposableServer server = TcpServer.create()
 			.port(rtmpPort)
@@ -118,6 +119,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 		server.onDispose().block();
 	}
 
+	// rtmp 서버 원본
 	public void runWithAuthAndTrancodingException(String... args) {
 		DisposableServer server = TcpServer.create()
 			.port(1935)

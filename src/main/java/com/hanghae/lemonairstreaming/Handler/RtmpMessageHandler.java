@@ -33,7 +33,7 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 	@Autowired
 	WebClient webClient;
 	private String currentSessionStream;
-	@Value("${auth.server}")
+	@Value("${external.auth.server.ip}")
 	private String authAddress;
 
 	public RtmpMessageHandler(StreamContext context) {
