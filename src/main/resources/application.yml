@@ -11,3 +11,23 @@ spring:
 logging:
   level:
     org.springframework.r2dbc.core: debug
+
+internal:
+  rtmp:
+    server:
+      ip: 127.0.0.1
+      port: 1935
+
+external:
+  transcoding:
+    server:
+      ip: 127.0.0.1
+      port: 8080
+  contents:
+    server:
+      ip: 127.0.0.1
+      port: 8080
+  auth:
+    server:
+      ip: 127.0.0.1
+      port: 8080
