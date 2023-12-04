@@ -97,7 +97,9 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 		}
 
 		// app = stream name
-		this.currentSessionStream = app;
+		// TODO: 2023-12-04  app으로 빈 문자열이 넘어와서 transcoding server로 전달되지 못하는지 테스트중
+		this.currentSessionStream = "byeongyreol";
+		// this.currentSessionStream = app;
 
 		// window acknowledgement size
 		//log.info("Sending window ack size message");

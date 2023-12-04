@@ -11,6 +11,7 @@ logging:
   level:
     org.springframework.r2dbc.core: debug
 
+
 internal:
   rtmp:
     server:
@@ -20,7 +21,7 @@ internal:
 external:
   transcoding:
     server:
-      ip: localhost
+      ip: http://localhost
       port: 6565
   contents:
     server:
