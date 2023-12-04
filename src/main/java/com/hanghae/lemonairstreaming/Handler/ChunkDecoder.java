@@ -39,7 +39,7 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 
 	@Override
 	protected void decode(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, List<Object> out) throws Exception {
-		log.info("디코딩 시작");
+		// log.info("디코딩 시작");
 		DecodeState state = state();
 		if (state == null) {
 			state = DecodeState.READ_HEADER;
@@ -47,13 +47,13 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 
 		switch (state) {
 			case READ_HEADER -> {
-				log.info("READ_HEADER state");
+				// log.info("READ_HEADER state");
 				currentHeader = readHeader(byteBuf);
 				restoreHeader(currentHeader);
 				checkpoint(DecodeState.PROCESS_HEADER);
 			}
 			case PROCESS_HEADER -> {
-				log.info("PROCESS_HEADER state");
+				// log.info("PROCESS_HEADER state");
 				int messageLength = currentHeader.getMessageLength();
 
 				if (currentHeader.getFmt() != RtmpConstants.RTMP_CHUNK_TYPE_3) {
@@ -69,7 +69,7 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 				checkpoint(DecodeState.PROCESS_PAYLOAD);
 			}
 			case PROCESS_PAYLOAD -> {
-				log.info("PROCESS_PAYLOAD state");
+				// log.info("PROCESS_PAYLOAD state");
 				byte[] bytes = new byte[Math.min(clientChunkSize, currentPayload.writableBytes())];
 				byteBuf.readBytes(bytes);
 				currentPayload.writeBytes(bytes);
@@ -125,7 +125,7 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		// Read Message Header
 		switch (fmt) {
 			case RtmpConstants.RTMP_CHUNK_TYPE_0 -> {
-				log.info("RTMP_CHUNK_TYPE_0");
+				// log.info("RTMP_CHUNK_TYPE_0");
 				int timestamp = buf.readMedium();
 				int messageLength = buf.readMedium();
 				short type = (short) (buf.readByte() & 0xff);
@@ -145,7 +145,7 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 				header.setStreamId(messageStreamId);
 			}
 			case RtmpConstants.RTMP_CHUNK_TYPE_1 -> {
-				log.info("RTMP_CHUNK_TYPE_1");
+				// log.info("RTMP_CHUNK_TYPE_1");
 				int timestampDelta = buf.readMedium();
 				int messageLength = buf.readMedium();
 				short type = (short) (buf.readByte() & 0xff);
@@ -163,7 +163,7 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 				header.setType(type);
 			}
 			case RtmpConstants.RTMP_CHUNK_TYPE_2 -> {
-				log.info("RTMP_CHUNK_TYPE_2");
+				// log.info("RTMP_CHUNK_TYPE_2");
 				int timestampDelta = buf.readMedium();
 				headerLength += 3;
 				// Presence of extended timestamp

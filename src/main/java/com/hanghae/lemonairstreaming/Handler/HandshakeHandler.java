@@ -11,7 +11,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import lombok.extern.slf4j.Slf4j;
 
-@Slf4j(topic = "HandshakeHandler")
+@Slf4j
 public class HandshakeHandler extends ByteToMessageDecoder {
 
 	private boolean C0C1;

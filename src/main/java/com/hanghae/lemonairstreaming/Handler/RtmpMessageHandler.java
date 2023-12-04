@@ -72,7 +72,7 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 	private void handleCommand(ChannelHandlerContext ctx, ByteBuf payload, List<Object> out) {
 		List<Object> decoded = Amf0Rules.decodeAll(payload);
 		String command = (String)decoded.get(0);
-		log.info(command + ">>>" + decoded);
+		log.info("handleCommand method :" +  command + ">>>" + decoded);
 		switch (command) {
 			case "connect" -> onConnect(ctx, decoded);
 			case "createStream" -> onCreate(ctx, decoded);

@@ -20,8 +20,8 @@ internal:
 external:
   transcoding:
     server:
-      ip: 127.0.0.1
-      port: 8080
+      ip: localhost
+      port: 6565
   contents:
     server:
       ip: 127.0.0.1
@@ -30,3 +30,6 @@ external:
     server:
       ip: 127.0.0.1
       port: 8080
+
+ec2:
+  server: 127.0.0.1

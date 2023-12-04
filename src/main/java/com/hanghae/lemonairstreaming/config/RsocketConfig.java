@@ -2,6 +2,7 @@ package com.hanghae.lemonairstreaming.config;
 
 import java.time.Duration;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.rsocket.RSocketRequester;
@@ -13,8 +14,8 @@ import reactor.util.retry.Retry;
 @Configuration
 public class RsocketConfig {
 
-	//@Value("${ec2.server}")
-	private String host = "127.0.0.1";
+	@Value("${ec2.server}")
+	private String host;
 
 	@Bean
 	public RSocketRequester getRSocketRequester(RSocketStrategies rSocketStrategies) {

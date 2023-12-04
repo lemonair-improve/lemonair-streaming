@@ -42,6 +42,9 @@ public abstract class RtmpServer implements CommandLineRunner {
 	//transcoding.server 프로퍼티 값을 주입합니다. 트랜스코딩 서버 주소를 나타냅니다.
 	@Value("${external.transcoding.server.ip}")
 	private String transcodingServerIp;
+
+	@Value("${external.transcoding.server.port}")
+	private int transcodingServerPort;
 	//auth.server 프로퍼티 값을 주입합니다. 인증 서버 주소를 나타냅니다.
 	@Value("${external.contents.server.ip}")
 	private String contentsServerIp;
@@ -89,7 +92,8 @@ public abstract class RtmpServer implements CommandLineRunner {
 							stream.sendPublishMessage();
 							stream.getReadyToBroadcast().thenRun(() -> webClient
 								.get()
-								.uri(transcodingServerIp + "/ffmpeg/" + stream.getStreamName())
+								//문제 발생 예상 코드 아래로 접속 요청을 보내는데, 아래 .retryWhen에서 정의한 3번의 재시도가 모두 실패했다는 Retries wchausted: 3/3 오류가 발생한다.
+								.uri(transcodingServerIp + ":" + transcodingServerPort + "/transcode/" + stream.getStreamName())
 								.retrieve()
 								.bodyToMono(Long.class)
 								.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(1000)))
@@ -153,7 +157,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 								stream.sendPublishMessage();
 								stream.getReadyToBroadcast().thenRun(() -> webClient
 									.get()
-									.uri(transcodingServerIp + "/ffmpeg/" + stream.getStreamName())
+									.uri(transcodingServerIp + ":" + transcodingServerPort + "/transcode/" + stream.getStreamName())
 									.retrieve()
 									.bodyToMono(Long.class)
 									.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(1000)))

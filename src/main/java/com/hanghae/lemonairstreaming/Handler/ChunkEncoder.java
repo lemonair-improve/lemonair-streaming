@@ -20,6 +20,7 @@ public class ChunkEncoder extends MessageToByteEncoder<RtmpMessage> {
 
 	@Override
 	protected void encode(ChannelHandlerContext channelHandlerContext, RtmpMessage message, ByteBuf byteBuf) {
+		log.info("message.header().getType() : " + message.header().getType());
 		switch (message.header().getType()) {
 			case RtmpConstants.RTMP_MSG_CONTROL_TYPE_SET_CHUNK_SIZE -> handleSetChunkSize(message, byteBuf);
 			case RtmpConstants.RTMP_MSG_USER_CONTROL_TYPE_AUDIO -> handleAudioMessage(message, byteBuf);
@@ -61,6 +62,8 @@ public class ChunkEncoder extends MessageToByteEncoder<RtmpMessage> {
 	}
 
 	private void encodeFmt0(RtmpMessage message, ByteBuf buf) {
+
+		log.info("encodeFmt0");
 		boolean extendedTimestamp = false;
 
 		int cid = message.header().getCid();
@@ -89,6 +92,8 @@ public class ChunkEncoder extends MessageToByteEncoder<RtmpMessage> {
 	}
 
 	private void encodeFmt1(RtmpMessage message, ByteBuf buf) {
+		log.info("encodeFmt1");
+
 		int cid = message.header().getCid();
 		byte[] basicHeader = encodeFmtAndChunkId(RtmpConstants.RTMP_CHUNK_TYPE_1, cid);
 		buf.writeBytes(basicHeader);
@@ -102,6 +107,8 @@ public class ChunkEncoder extends MessageToByteEncoder<RtmpMessage> {
 	}
 
 	private void encodeFmt3(RtmpMessage message, ByteBuf buf) {
+		log.info("encodeFmt3");
+
 		int cid = message.header().getCid();
 		byte[] basicHeader = encodeFmtAndChunkId(RtmpConstants.RTMP_CHUNK_TYPE_3, cid);
 		while (message.payload().isReadable()) {
