@@ -48,7 +48,7 @@ public class Stream {
 
 	public void addMedia(RtmpMediaMessage message) {
 		short type = message.header().getType();
-
+		// log.info(message.header().toString());
 		if (type == (short) RtmpConstants.RTMP_MSG_USER_CONTROL_TYPE_AUDIO) {
 			if (message.isAudioConfig()) {
 				log.info("Audio config is set");

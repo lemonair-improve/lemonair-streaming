@@ -84,6 +84,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 				.addHandlerLast(getRtmpMessageHandler()))
 			.option(ChannelOption.SO_BACKLOG, 128)
 			.childOption(ChannelOption.SO_KEEPALIVE, true)
+			// tcp 프로토콜 서버의 환경설정
 			.handle((in, out) -> in
 				.receiveObject()
 				.cast(Stream.class)

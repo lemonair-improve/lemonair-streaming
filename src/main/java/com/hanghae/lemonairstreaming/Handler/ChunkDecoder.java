@@ -96,6 +96,7 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		}
 	}
 
+
 	private RtmpHeader readHeader(ByteBuf buf) {
 
 		RtmpHeader header = new RtmpHeader();
@@ -103,6 +104,9 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		byte firstByte = buf.readByte();
 		headerLength++;
 
+		// fmt : format
+		// cid : 
+		// 0xff : 11111111
 		// Decode Basic Header
 		int fmt = (firstByte & 0xff) >> 6;
 		int cid = firstByte & 0x3f;
@@ -123,9 +127,10 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		header.setFmt(fmt);
 
 		// Read Message Header
+		// 해당 스트리머의 요청 헤더가 처음인 경우
 		switch (fmt) {
 			case RtmpConstants.RTMP_CHUNK_TYPE_0 -> {
-				// log.info("RTMP_CHUNK_TYPE_0");
+				log.info("RTMP_CHUNK_TYPE_0");
 				int timestamp = buf.readMedium();
 				int messageLength = buf.readMedium();
 				short type = (short) (buf.readByte() & 0xff);
@@ -144,8 +149,9 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 				header.setType(type);
 				header.setStreamId(messageStreamId);
 			}
+			// header type이 1인 경우 이전 헤더와 streamID가 같음
 			case RtmpConstants.RTMP_CHUNK_TYPE_1 -> {
-				// log.info("RTMP_CHUNK_TYPE_1");
+				log.info("RTMP_CHUNK_TYPE_1");
 				int timestampDelta = buf.readMedium();
 				int messageLength = buf.readMedium();
 				short type = (short) (buf.readByte() & 0xff);
@@ -162,8 +168,9 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 				header.setMessageLength(messageLength);
 				header.setType(type);
 			}
+			// 영상의 길이가 32비트를 초과하는 경우
 			case RtmpConstants.RTMP_CHUNK_TYPE_2 -> {
-				// log.info("RTMP_CHUNK_TYPE_2");
+				log.info("RTMP_CHUNK_TYPE_2");
 				int timestampDelta = buf.readMedium();
 				headerLength += 3;
 				// Presence of extended timestamp
@@ -175,12 +182,11 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 				header.setTimestampDelta(timestampDelta);
 
 			}
-            /*
-            Type 3 chunks have no message header.
-            The stream ID, message length and timestamp delta fields are not present;
-            chunks of this type take values from the preceding chunk for the same Chunk Stream ID
-            */
-			case RtmpConstants.RTMP_CHUNK_TYPE_3 -> {/* Do nothing */}
+            // header type이 3인 경우 이전 헤더와 동일한 경우로써 다른 작업이 필요하지 않음 
+			case RtmpConstants.RTMP_CHUNK_TYPE_3 -> {
+				/* Do nothing */
+				log.info("RTMP_CHUNK_TYPE_3");
+			}
 			default -> {
 				log.error("readHeader 함수에서 switch문에 걸리지 않음");
 				log.error("fmt :" + fmt);

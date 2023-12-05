@@ -87,7 +87,14 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 	private void onConnect(ChannelHandlerContext ctx, List<Object> message) {
 		log.info("Client connection from {}, channel id is {}", ctx.channel().remoteAddress(), ctx.channel().id());
 
+		// message.get(0) -> operation 관련
+		// message.get(1) -> 1.0 뭔지 모름
+		// message.get(2) -> payload
+
+
 		String app = (String)((Map<String, Object>)message.get(2)).get("app");
+		log.info(message.toString());
+
 		Integer clientEncodingFormat = (Integer)((Map<String, Object>)message.get(2)).get("objectEncoding");
 
 		if (clientEncodingFormat != null && clientEncodingFormat == 3) {
@@ -96,10 +103,7 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 			return;
 		}
 
-		// app = stream name
-		// TODO: 2023-12-04  app으로 빈 문자열이 넘어와서 transcoding server로 전달되지 못하는지 테스트중
-		this.currentSessionStream = "byeongyreol";
-		// this.currentSessionStream = app;
+		this.currentSessionStream = app;
 
 		// window acknowledgement size
 		//log.info("Sending window ack size message");

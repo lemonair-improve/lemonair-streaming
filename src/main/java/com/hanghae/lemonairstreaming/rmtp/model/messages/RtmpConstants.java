@@ -46,8 +46,8 @@ public class RtmpConstants {
 	/* User Control Messages Event (4) */
 	public static final int RTMP_MSG_USER_CONTROL_TYPE_EVENT = 4;
 
-	public static final int RTMP_MSG_USER_CONTROL_TYPE_AUDIO = 8;
-	public static final int RTMP_MSG_USER_CONTROL_TYPE_VIDEO = 9;
+	public static final int RTMP_MSG_USER_CONTROL_TYPE_AUDIO = 8; // message.header.type =8 헤더에 오디오 타입임이 정의됨
+	public static final int RTMP_MSG_USER_CONTROL_TYPE_VIDEO = 9; // message.header.type =8 헤더에 비디오 타입임이 정의됨
 
 	/* Data Message */
 	public static final int RTMP_MSG_DATA_TYPE_AMF3 = 15; // AMF3
