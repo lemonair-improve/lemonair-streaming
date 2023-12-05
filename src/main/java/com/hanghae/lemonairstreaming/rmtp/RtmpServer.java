@@ -120,7 +120,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 										});
 								}));
 						return Mono.empty();
-						}).then()).bindNow();
+						}).then()).bindNow(); // runner로 돌아가는 rtmp 서버 유지
 		server.onDispose().block();
 	}
 
@@ -211,7 +211,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 						});
 				})
 				.then())
-			.bindNow(); // runner로 돌아가는 rtmp 서버 유지
+			.bindNow();
 		server.onDispose().block();
 	}
 }
