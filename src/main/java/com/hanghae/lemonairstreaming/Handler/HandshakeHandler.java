@@ -11,7 +11,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import lombok.extern.slf4j.Slf4j;
 
-@Slf4j(topic = "HandshakeHandler")
+@Slf4j
 public class HandshakeHandler extends ByteToMessageDecoder {
 
 	private boolean C0C1;
@@ -29,12 +29,15 @@ public class HandshakeHandler extends ByteToMessageDecoder {
 			return;
 		}
 
-		// client 0 client 1
+		// 청크2개 검사
+		// 클라이언트 측의 청크를 2번 받아서 연결에 이상이 없는지 확인하고
+		// 서버 측에서 클라이언트에 대한 응답을 S1S2S3으로 생성하여 확인한다
 		if (!C0C1) {
 			// C0
 			//read version
 			byte version = byteBuf.readByte();
 			if (!(version == RtmpConstants.RTMP_VERSION)) {
+				// 현재 version이 71로 넘어온다.
 				log.info("Client requests unsupported version: " + version);
 			}
 			// C1
@@ -64,6 +67,9 @@ public class HandshakeHandler extends ByteToMessageDecoder {
 		}
 	}
 
+	// S0 - RTMP 버전 정보
+	// S1 - C1의 타임스탬프를 0으로 설정, 0으로 채워진 4바이트와 랜덤한 1528 바이트 생성
+	// S2 - C1의 타임 스탬프를 그대로 사용, 0으로 채워진 4바이트와 랜덤한 1528 바이트 생성
 	private void generateS0S1S2(ChannelHandlerContext channelHandlerContext) {
 		ByteBuf resp = Unpooled.buffer(RtmpConstants.RTMP_HANDSHAKE_VERSION_LENGTH
 			+ RtmpConstants.RTMP_HANDSHAKE_SIZE + RtmpConstants.RTMP_HANDSHAKE_SIZE);

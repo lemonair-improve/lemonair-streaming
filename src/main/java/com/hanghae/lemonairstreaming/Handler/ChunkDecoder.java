@@ -37,9 +37,10 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		READ_HEADER, PROCESS_HEADER, PROCESS_PAYLOAD
 	}
 
+	// RTMP 프로토콜로 들어온 스트림을 디코딩
 	@Override
 	protected void decode(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, List<Object> out) throws Exception {
-		log.info("디코딩 시작");
+		// log.info("디코딩 시작");
 		DecodeState state = state();
 		if (state == null) {
 			state = DecodeState.READ_HEADER;
@@ -47,13 +48,13 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 
 		switch (state) {
 			case READ_HEADER -> {
-				log.info("READ_HEADER state");
+				// log.info("READ_HEADER state");
 				currentHeader = readHeader(byteBuf);
 				restoreHeader(currentHeader);
 				checkpoint(DecodeState.PROCESS_HEADER);
 			}
 			case PROCESS_HEADER -> {
-				log.info("PROCESS_HEADER state");
+				// log.info("PROCESS_HEADER state");
 				int messageLength = currentHeader.getMessageLength();
 
 				if (currentHeader.getFmt() != RtmpConstants.RTMP_CHUNK_TYPE_3) {
@@ -69,7 +70,7 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 				checkpoint(DecodeState.PROCESS_PAYLOAD);
 			}
 			case PROCESS_PAYLOAD -> {
-				log.info("PROCESS_PAYLOAD state");
+				// log.info("PROCESS_PAYLOAD state");
 				byte[] bytes = new byte[Math.min(clientChunkSize, currentPayload.writableBytes())];
 				byteBuf.readBytes(bytes);
 				currentPayload.writeBytes(bytes);
@@ -96,12 +97,14 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		}
 	}
 
+	// RTMP 스트림의 헤더를 읽는 작업
 	private RtmpHeader readHeader(ByteBuf buf) {
 
 		RtmpHeader header = new RtmpHeader();
 		int headerLength = 0;
 		byte firstByte = buf.readByte();
 		headerLength++;
+
 
 		// Decode Basic Header
 		int fmt = (firstByte & 0xff) >> 6;
@@ -125,7 +128,7 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		// Read Message Header
 		switch (fmt) {
 			case RtmpConstants.RTMP_CHUNK_TYPE_0 -> {
-				log.info("RTMP_CHUNK_TYPE_0");
+				// log.info("RTMP_CHUNK_TYPE_0");
 				int timestamp = buf.readMedium();
 				int messageLength = buf.readMedium();
 				short type = (short) (buf.readByte() & 0xff);
@@ -145,7 +148,7 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 				header.setStreamId(messageStreamId);
 			}
 			case RtmpConstants.RTMP_CHUNK_TYPE_1 -> {
-				log.info("RTMP_CHUNK_TYPE_1");
+				// log.info("RTMP_CHUNK_TYPE_1");
 				int timestampDelta = buf.readMedium();
 				int messageLength = buf.readMedium();
 				short type = (short) (buf.readByte() & 0xff);
@@ -163,7 +166,7 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 				header.setType(type);
 			}
 			case RtmpConstants.RTMP_CHUNK_TYPE_2 -> {
-				log.info("RTMP_CHUNK_TYPE_2");
+				// log.info("RTMP_CHUNK_TYPE_2");
 				int timestampDelta = buf.readMedium();
 				headerLength += 3;
 				// Presence of extended timestamp
@@ -192,6 +195,7 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		return header;
 	}
 
+	// 부분적으로 수신된 헤더를 복원하는 과정
 	private void restoreHeader(RtmpHeader header) {
 		int cid = header.getCid();
 		RtmpHeader completeHeader = completeHeaders.get(cid);
@@ -225,6 +229,10 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 	This message specifies the sequence number, which is the number of the bytes received so far.
 		SEQUENCE NUMBER (32 bits): This field holds the number of bytes received so far.
 	*/
+
+	// RTMP 통신에서 Acknowledgement 역할 수행
+	// 수신한 바이트 수를 상대에게 알려줘서 트래픽을 조절하는 로직 수행
+	// 즉 수신 및 처리되는 데이터 양을 제어하는 로직
 	private void sendAcknowledgement(ChannelHandlerContext channelHandlerContext, int inSize) {
 		bytesReceived += inSize;
 		// handle overflow
@@ -241,20 +249,28 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		}
 	}
 
+	// payload에서 ackSize 값 받아오기
+	// 데이터 처리량을 제어하기 위한 값
 	private void handleWindowAckSize(ByteBuf payload) {
 		ackSize = payload.readInt();
 		payload.release();
 	}
 
+	// 데이터 전송의 크기를 결정하는 데 사용
 	private void handleChunkSize(ByteBuf payload) {
 		clientChunkSize = payload.readInt();
 		payload.release();
 	}
 
+	// ACK 메시지를 받고 처리하는 로직
+	// 특별한 처리를 하지 않고 payload만 해제
 	private void handleAck(ByteBuf payload) {
 		payload.release();
 	}
 
+	// 데이터 스트림을 중단하는 로직
+	// 일반적으로 Abort 메시지는 연결 종료 혹은 데이터 스트림을 중단하기 위해 사용
+	// 특별한 처리를 하지 않고 payload만 해제
 	private void handleAbort(ByteBuf payload) {
 		payload.release();
 	}
