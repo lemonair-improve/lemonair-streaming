@@ -36,8 +36,8 @@ jobs:
           key: ${{ secrets.PRIVATE_KEY }}
           script: |
             cd scripts
-            sudo docker ps -a -q --filter "name=app" | grep -q . && docker stop app && docker rm app | true
+            sudo docker ps -a -q --filter "name=streaming" | grep -q . && docker stop streaming && docker rm streaming | true
             sudo docker rmi ${{ secrets.DOCKER_ID }}/${{ secrets.DOCKER_REPO }}
             sudo docker pull ${{ secrets.DOCKER_ID }}/${{ secrets.DOCKER_REPO }}
-            docker run -d -p 8080:8080 --env-file=env_list.txt --name app ${{ secrets.DOCKER_ID }}/${{ secrets.DOCKER_REPO }}
+            docker run -d -p 8080:8080 --env-file=env_list.txt --name streaming ${{ secrets.DOCKER_ID }}/${{ secrets.DOCKER_REPO }}
             docker rmi -f $(docker images -f "dangling=true" -q) || true
