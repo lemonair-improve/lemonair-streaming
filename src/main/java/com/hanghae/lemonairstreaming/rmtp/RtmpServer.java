@@ -101,7 +101,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 								.doOnError(error -> log.info("Transcoding 서버에서 다음의 에러가 발생했습니다 : " + error.getMessage()))
 								.onErrorComplete() // 에러가 발생해도 무시하고 onComplete 메서드 실행
 								.subscribe((s) -> { // 비동기적으로 실행되는 코드블록 정의
-									log.info("Transcoding server started ffmpeg with pid " + s.toString());
+									log.info("transcoding 서비스 구독 시작  pid : " + s.toString());
 									webClient
 										.post() // 비동기 post 요청
 										.uri(contentsServerIp + "/broadcasts/" + stream.getStreamName() + "/onair") // post 요청 uri (컨텐츠 서버)
@@ -110,7 +110,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 										.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500))) // 재시도
 										.doOnError(e -> log.info(e.getMessage())) // 에러 정의
 										.onErrorReturn(Boolean.FALSE) // 에러 발생 시 스트림의 종료를 방지
-										.subscribeOn(Schedulers.parallel()) // 구독이 별도의 병렬 스레드에서 실행되도록 설정(비동기적 실행, 기존 스레드를 차단하지 않음)
+										.subscribeOn(Schedulers.parallel()) // contents 서버를 구독하는 작업이 병렬 스레드에서 실행되도록 설정(비동기적 실행, 기존 스레드를 차단하지 않음)
 										.subscribe((t) -> { // 비동기 작업 콜백 로깅
 											if (t) {
 												log.info("방송이 시작됩니다.");
@@ -119,9 +119,13 @@ public abstract class RtmpServer implements CommandLineRunner {
 											}
 										});
 								}));
-						return Mono.empty();
-						}).then()).bindNow();
+						log.info("Mono.empty() 반환되는 부분");
+						return Mono.empty(); // rtmp 프로토콜로 들어온 영상 송출 요청에 대한 작업이 종료되었음을 나타낸다.
+						}).then()).bindNow(); // 서버의 환경 설정과 구독 관계 설정이 끝나면 서버가 BindNow된다.
+		// onDispose() DisposableServer 소멸이벤드에 대한 Mono 반환
+		// .block()으로 서버가 onDispose()되어 Mono가 반환될때까지 기다린다.
 		server.onDispose().block();
+
 	}
 
 	// rtmp 서버 원본
@@ -152,6 +156,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 						.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
 						.doOnError(error -> log.info(error.getMessage()))
 						.onErrorReturn(Boolean.FALSE)
+						// 위의 결과로 ans를 받는다.
 						.flatMap(ans -> {
 							if (ans) {
 								log.info("스트리머 {} 의 stream key가 유효합니다.", stream.getStreamName());
@@ -186,7 +191,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 									})
 									.onErrorComplete()
 									.subscribe((s) -> {
-										log.info("Transcoding server started ffmpeg with pid " + s.toString());
+										log.info("Transcoding 서버를 구독합니다. " + s.toString());
 										webClient
 											.post()
 											.uri(authServerIp + "/broadcasts/" + stream.getStreamName() + "/onair")
