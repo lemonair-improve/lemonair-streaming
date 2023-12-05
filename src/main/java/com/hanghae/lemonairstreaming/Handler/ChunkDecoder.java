@@ -37,6 +37,7 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		READ_HEADER, PROCESS_HEADER, PROCESS_PAYLOAD
 	}
 
+	// RTMP 프로토콜로 들어온 스트림을 디코딩
 	@Override
 	protected void decode(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, List<Object> out) throws Exception {
 		// log.info("디코딩 시작");
@@ -96,12 +97,14 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		}
 	}
 
+	// RTMP 스트림의 헤더를 읽는 작업
 	private RtmpHeader readHeader(ByteBuf buf) {
 
 		RtmpHeader header = new RtmpHeader();
 		int headerLength = 0;
 		byte firstByte = buf.readByte();
 		headerLength++;
+
 
 		// Decode Basic Header
 		int fmt = (firstByte & 0xff) >> 6;
@@ -192,6 +195,7 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		return header;
 	}
 
+	// 부분적으로 수신된 헤더를 복원하는 과정
 	private void restoreHeader(RtmpHeader header) {
 		int cid = header.getCid();
 		RtmpHeader completeHeader = completeHeaders.get(cid);
@@ -225,6 +229,10 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 	This message specifies the sequence number, which is the number of the bytes received so far.
 		SEQUENCE NUMBER (32 bits): This field holds the number of bytes received so far.
 	*/
+
+	// RTMP 통신에서 Acknowledgement 역할 수행
+	// 수신한 바이트 수를 상대에게 알려줘서 트래픽을 조절하는 로직 수행
+	// 즉 수신 및 처리되는 데이터 양을 제어하는 로직
 	private void sendAcknowledgement(ChannelHandlerContext channelHandlerContext, int inSize) {
 		bytesReceived += inSize;
 		// handle overflow
@@ -241,20 +249,28 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		}
 	}
 
+	// payload에서 ackSize 값 받아오기
+	// 데이터 처리량을 제어하기 위한 값
 	private void handleWindowAckSize(ByteBuf payload) {
 		ackSize = payload.readInt();
 		payload.release();
 	}
 
+	// 데이터 전송의 크기를 결정하는 데 사용
 	private void handleChunkSize(ByteBuf payload) {
 		clientChunkSize = payload.readInt();
 		payload.release();
 	}
 
+	// ACK 메시지를 받고 처리하는 로직
+	// 특별한 처리를 하지 않고 payload만 해제
 	private void handleAck(ByteBuf payload) {
 		payload.release();
 	}
 
+	// 데이터 스트림을 중단하는 로직
+	// 일반적으로 Abort 메시지는 연결 종료 혹은 데이터 스트림을 중단하기 위해 사용
+	// 특별한 처리를 하지 않고 payload만 해제
 	private void handleAbort(ByteBuf payload) {
 		payload.release();
 	}

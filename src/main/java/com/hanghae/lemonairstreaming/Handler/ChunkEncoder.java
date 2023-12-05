@@ -18,6 +18,8 @@ public class ChunkEncoder extends MessageToByteEncoder<RtmpMessage> {
 	private boolean videoFirstMessage = true;
 	private boolean audioFirstMessage = true;
 
+	// RTMP의 message를 바이트로 변환
+	// RTMP message의 header 타입에 따라 분기 처리
 	@Override
 	protected void encode(ChannelHandlerContext channelHandlerContext, RtmpMessage message, ByteBuf byteBuf) {
 		log.info("message.header().getType() : " + message.header().getType());
@@ -29,11 +31,18 @@ public class ChunkEncoder extends MessageToByteEncoder<RtmpMessage> {
 		}
 	}
 
+
+	// header 타입이 CHUNK_SIZE, AUDIO, VIDEO가 아닐 경우
+	// encodeFmt0, encodeFmt3으로 처리
 	private void handleDefault(RtmpMessage message, ByteBuf buf) {
 		encodeFmt0(message, buf);
 		encodeFmt3(message, buf);
 	}
 
+
+	// header 타입이 AUDIO
+	// 첫번째 audio 메시지인 경우에는 handleDefault로 처리
+	// 아닌 경우에는 encodeFmt1과 encodeFmt3으로 처리
 	private void handleAudioMessage(RtmpMessage message, ByteBuf buf) {
 		if (audioFirstMessage) {
 			log.info("Audio config is sent");
@@ -45,6 +54,9 @@ public class ChunkEncoder extends MessageToByteEncoder<RtmpMessage> {
 		}
 	}
 
+	// header 타입이 VIDEO
+	// 첫번째 video 메시지인 경우에는 handleDefault로 처리
+	// 아닌 경우에는 encodeFmt1과 encodeFmt3으로 처리
 	private void handleVideoMessage(RtmpMessage message, ByteBuf buf) {
 		if (videoFirstMessage) {
 			log.info("Video config is sent");
@@ -56,11 +68,18 @@ public class ChunkEncoder extends MessageToByteEncoder<RtmpMessage> {
 		}
 	}
 
+	// header 타입이 CHUNK_SIZE
+	// chunkSize를 읽어오고 메시지에 대한 처리
 	private void handleSetChunkSize(RtmpMessage message, ByteBuf buf) {
 		chunkSize = message.payload().copy().readInt();
 		handleDefault(message, buf);
 	}
 
+
+	// 왜 encodeFmt2인 경우는 없을까,,?
+
+	// RTMP Fmt 타입이 0인 경우
+	// Fmt 0이 필요로 하는 정보들을 채우고 메시지 형식을 생성
 	private void encodeFmt0(RtmpMessage message, ByteBuf buf) {
 
 		log.info("encodeFmt0");
