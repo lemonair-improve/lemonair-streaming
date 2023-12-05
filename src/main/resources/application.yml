@@ -1,36 +1,8 @@
 spring:
-  r2dbc:
-    url: r2dbc:pool:mysql://localhost:3306/streamtest
-    username: root
-    password: uioprewq
-    #    pool:
-    #      initial-size: connection_pool_initial_size
-    #      max-size: connection_pool_max_size
-# ?? ?? - R2DBC?? Database? ??? ??? ?? ??? ???? ????? ???? ?
-logging:
-  level:
-    org.springframework.r2dbc.core: debug
-
-
-internal:
-  rtmp:
-    server:
-      ip: 127.0.0.1
-      port: 1935
-
-external:
-  transcoding:
-    server:
-      ip: http://localhost
-      port: 6565
-  contents:
-    server:
-      ip: 127.0.0.1
-      port: 8080
-  auth:
-    server:
-      ip: 127.0.0.1
-      port: 8080
-
-ec2:
-  server: 127.0.0.1
+  profiles:
+    default: local
+    group:
+      local:
+    include:
+      - common
+      - local

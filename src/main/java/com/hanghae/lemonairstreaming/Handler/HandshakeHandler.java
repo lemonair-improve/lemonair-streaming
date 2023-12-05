@@ -35,6 +35,7 @@ public class HandshakeHandler extends ByteToMessageDecoder {
 			//read version
 			byte version = byteBuf.readByte();
 			if (!(version == RtmpConstants.RTMP_VERSION)) {
+				// 현재 version이 71로 넘어온다.
 				log.info("Client requests unsupported version: " + version);
 			}
 			// C1
