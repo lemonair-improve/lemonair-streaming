@@ -13,8 +13,10 @@ public class InboundConnectionLogger extends ChannelInboundHandlerAdapter {
 
 	LocalDateTime connectionTime = LocalDateTime.now();
 
+	// 여기서 channel은 Socket의 채널을 의미
+
 	/*
-	channel 활성화
+	channel이 활성화 상태인 경우에 로그 기록
 	 */
 	@Override
 	public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
@@ -24,7 +26,7 @@ public class InboundConnectionLogger extends ChannelInboundHandlerAdapter {
 	}
 
 	/*
-	channel 비활성화
+	channel 비활성화된 상태일 때 로그 기록
 	 */
 	@Override
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
