@@ -7,6 +7,5 @@ COPY $JAR_FILE_PATH app.jar
 EXPOSE 8080
 EXPOSE 1935
 
-ENV PROFILE tempgroup
 
-ENTRYPOINT ["java", "-Dspring.profiles.active=${PROFILE}", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-Dspring.profiles.active=common, local, temp", "-jar", "app.jar"]
