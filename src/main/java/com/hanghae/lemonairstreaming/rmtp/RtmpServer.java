@@ -51,6 +51,9 @@ public abstract class RtmpServer implements CommandLineRunner {
 	@Value("${external.service.server.ip}")
 	private String serviceServerIp;
 
+	@Value("${external.service.server.port}")
+	private int ServiceServerPort;
+
 //	@Value("${external.auth.server.ip}")
 //	private String serviceServerIp;
 
@@ -121,7 +124,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 		log.info("transcoding 서비스 구독 시작  pid : " + s.toString());
 		webClient
 			.post() // 비동기 post 요청
-			.uri(serviceServerIp + "/broadcasts/" + stream.getStreamName() + "/onair") // post 요청 uri (컨텐츠 서버)
+			.uri(serviceServerIp + "/api/streams/" + stream.getStreamName() + "/streaming") // post 요청 uri (컨텐츠 서버)
 			.retrieve() // 응답 수신
 			.bodyToMono(Boolean.class) // 응답 형변환 (Boolean)
 			.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500))) // 재시도
@@ -132,7 +135,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 				if (t) {
 					log.info("방송이 시작됩니다.");
 				} else {
-					log.info("ContentService 서버와 통신 에러 발생");
+					log.info("Service 서버와 통신 에러 발생");
 				}
 			});
 	}
