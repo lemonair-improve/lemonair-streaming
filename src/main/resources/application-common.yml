@@ -14,10 +14,10 @@ external:
     server:
       ip: http://localhost
       port: 6565
-  contents:
+  service:
     server:
       ip: 127.0.0.1
-      port: 8080
+      port: 8081
   auth:
     server:
       ip: 127.0.0.1

@@ -46,11 +46,11 @@ public abstract class RtmpServer implements CommandLineRunner {
 	@Value("${external.transcoding.server.port}")
 	private int transcodingServerPort;
 	//auth.server 프로퍼티 값을 주입합니다. 인증 서버 주소를 나타냅니다.
-	@Value("${external.contents.server.ip}")
-	private String contentsServerIp;
+	@Value("${external.service.server.ip}")
+	private String serviceServerIp;
 
-	@Value("${external.auth.server.ip}")
-	private String authServerIp;
+//	@Value("${external.auth.server.ip}")
+//	private String serviceServerIp;
 
 	@Value("${internal.rtmp.server.port}")
 	private int rtmpPort;
@@ -103,7 +103,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 									log.info("Transcoding server started ffmpeg with pid " + s.toString());
 									webClient
 										.post()
-										.uri(contentsServerIp + "/broadcasts/" + stream.getStreamName() + "/onair")
+										.uri(serviceServerIp + "/api/streams/" + stream.getStreamName() + "/streaming")
 										.retrieve()
 										.bodyToMono(Boolean.class)
 										.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
@@ -114,7 +114,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 											if (t) {
 												log.info("방송이 시작됩니다.");
 											} else {
-												log.info("ContentService 서버와 통신 에러 발생");
+												log.info("Service 서버와 통신 에러 발생");
 											}
 										});
 								}));
@@ -143,7 +143,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 				.flatMap(stream -> {
 					return webClient
 						.post()
-						.uri(authServerIp + "/broadcasts/" + stream.getStreamName() + "/check")
+						.uri(serviceServerIp + "/api/streams/" + stream.getStreamName() + "/check")
 						.body(Mono.just(new StreamKey(stream.getStreamKey())), StreamKey.class)
 						.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
 						.retrieve()
@@ -164,8 +164,8 @@ public abstract class RtmpServer implements CommandLineRunner {
 									.doOnError(error -> {
 										log.info("Transcoding 서버에서 다음의 에러가 발생했습니다 : " + error.getMessage());
 										webClient
-											.post()
-											.uri(authServerIp + "/broadcasts/" + stream.getStreamName() + "/offair")
+											.delete()
+											.uri(serviceServerIp + "/api/streams/" + stream.getStreamName() + "/streaming")
 											.retrieve()
 											.bodyToMono(Boolean.class)
 											.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
@@ -188,7 +188,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 										log.info("Transcoding server started ffmpeg with pid " + s.toString());
 										webClient
 											.post()
-											.uri(authServerIp + "/broadcasts/" + stream.getStreamName() + "/onair")
+											.uri(serviceServerIp + "/api/streams/" + stream.getStreamName() + "/streaming")
 											.retrieve()
 											.bodyToMono(Boolean.class)
 											.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
@@ -199,7 +199,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 												if (t) {
 													log.info("방송이 시작됩니다.");
 												} else {
-													log.info("ContentService 서버와 통신 에러 발생");
+													log.info("Service 서버와 통신 에러 발생");
 												}
 											});
 									}));
