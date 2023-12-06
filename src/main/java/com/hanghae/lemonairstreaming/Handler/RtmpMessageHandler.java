@@ -24,7 +24,6 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.retry.Retry;
 
-// import static com.example.streamingservice.rtmp.model.messages.RtmpConstants.*;
 
 @Slf4j
 public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
@@ -57,7 +56,7 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 	}
 
 	// RTMP 프로토콜에서 받은 메시지를 디코딩하고 유형에 따라 처리
-	// COMMANE_TYPE_AMF0, DATA_TYPE_AMF0, AUDIO, VIDEO, EVENT
+	// COMMAND_TYPE_AMF0, DATA_TYPE_AMF0, AUDIO, VIDEO, EVENT
 	@Override
 	protected void decode(ChannelHandlerContext channelHandlerContext, RtmpMessage in, List<Object> out) {
 		short type = in.header().getType();

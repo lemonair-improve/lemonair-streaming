@@ -1,6 +1,7 @@
 package com.hanghae.lemonairstreaming.rmtp;
 
 import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -68,11 +69,11 @@ public abstract class RtmpServer implements CommandLineRunner {
 
 	@Override
 	public void run(String... args) {
-		runWithOutAuthTranscodingException(args);
+		runWithExtractedMethod(args);
 	}
 
-	// auth, transcoding 서버 통신간 예외처리 등 복잡한 로직 제외한 서버 build 코드
-	private void runWithOutAuthTranscodingException(String... args) {
+
+	private void runWithExtractedMethod(String... args){
 		DisposableServer server = TcpServer.create() // TCP 서버 생성
 			.port(rtmpPort) // RTMP 포트 설정 (1935)
 			.doOnBound(disposableServer -> // 서버가 바인드 되면 콜백 (시작 로깅)
@@ -87,42 +88,58 @@ public abstract class RtmpServer implements CommandLineRunner {
 			.childOption(ChannelOption.SO_KEEPALIVE, true) // TCP keep-alive 옵션 활성화
 			.handle((in, out) -> in // 서버가 IO 이벤트를 처리하는 방식 정의
 				.receiveObject() // 데이터 수신
-				.cast(Stream.class) // Stream으로 형변환
-					.flatMap(stream -> { // 각 스트림 객체에 대한 연산
-							log.info("스트리머 {} 의 stream key가 유효합니다.", stream.getStreamName());
-							stream.sendPublishMessage(); // 방송이 시작될 때 게시 알림
-							stream.getReadyToBroadcast().thenRun(() -> webClient // 스트림이 방송을 시작할 준비가 되었을 때 실행, webClient를 이용하여 비동기 get 요청
-								.get()
-								//문제 발생 예상 코드 아래로 접속 요청을 보내는데, 아래 .retryWhen에서 정의한 3번의 재시도가 모두 실패했다는 Retries wchausted: 3/3 오류가 발생한다.
-								.uri(transcodingServerIp + ":" + transcodingServerPort + "/transcode/" + stream.getStreamName()) // get요청을 보내는 uri
-								.retrieve() // 응답 수신
-								.bodyToMono(Long.class) // 서버의 응답을 Long 클래스로 매핑(Transcode 서버의 응답)
-								.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(1000))) // 재시도 로직
-								.doOnError(error -> log.info("Transcoding 서버에서 다음의 에러가 발생했습니다 : " + error.getMessage()))
-								.onErrorComplete() // 에러가 발생해도 무시하고 onComplete 메서드 실행
-								.subscribe((s) -> { // 비동기적으로 실행되는 코드블록 정의
-									log.info("Transcoding server started ffmpeg with pid " + s.toString());
-									webClient
-										.post() // 비동기 post 요청
-										.uri(contentsServerIp + "/broadcasts/" + stream.getStreamName() + "/onair") // post 요청 uri (컨텐츠 서버)
-										.retrieve() // 응답 수신
-										.bodyToMono(Boolean.class) // 응답 형변환 (Boolean)
-										.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500))) // 재시도
-										.doOnError(e -> log.info(e.getMessage())) // 에러 정의
-										.onErrorReturn(Boolean.FALSE) // 에러 발생 시 스트림의 종료를 방지
-										.subscribeOn(Schedulers.parallel()) // 구독이 별도의 병렬 스레드에서 실행되도록 설정(비동기적 실행, 기존 스레드를 차단하지 않음)
-										.subscribe((t) -> { // 비동기 작업 콜백 로깅
-											if (t) {
-												log.info("방송이 시작됩니다.");
-											} else {
-												log.info("ContentService 서버와 통신 에러 발생");
-											}
-										});
-								}));
-						return Mono.empty();
-						}).then()).bindNow();
-		server.onDispose().block();
+				.cast(Stream.class)
+				.doOnError((e)-> log.error("지원하지 않는 스트림 데이터 형식입니다. obs studio를 사용하세요"))// Stream으로 형변환
+				.onErrorComplete()
+				.flatMap(stream -> { // 각 스트림 객체에 대한 연산
+					log.info("스트리머 {} 의 stream key가 유효합니다.", stream.getStreamName());
+					stream.sendPublishMessage();
+					requestTranscoding(stream);
+					return Mono.empty(); // rtmp 프로토콜로 들어온 영상 송출 요청에 대한 작업이 종료되었음을 나타낸다.
+				}).then()).bindNow(); // 서버의 환경 설정과 구독 관계 설정이 끝나면 서버가 BindNow된다.
+		server.onDispose().block(); // .block()으로 서버가 onDispose()되어 Mono가 반환될때까지 기다린다.
 	}
+
+	private CompletableFuture<Void> requestTranscoding(Stream stream) {
+		return stream.getReadyToBroadcast()
+			.thenRun(() -> webClient // 스트림이 방송을 시작할 준비가 되었을 때 실행, webClient를 이용하여 비동기 get 요청
+				.get()
+				//문제 발생 예상 코드 아래로 접속 요청을 보내는데, 아래 .retryWhen에서 정의한 3번의 재시도가 모두 실패했다는 Retries wchausted: 3/3 오류가 발생한다.
+				.uri(transcodingServerIp + ":" + transcodingServerPort + "/transcode/"
+					+ stream.getStreamName()) // get요청을 보내는 uri
+				.retrieve() // 응답 수신
+				// transcoding service의 응답은 받은 이후 사용되지 않으며
+				// 그냥 응답이 오는지 안오는지가 중요하다.
+				// 응답이 정상적으로 온다면 트랜스코딩이 계속해서 진행중,
+				// 응답이 정상적으로 오지 않는다면 트랜스코딩 서버에서 문제가 발생한 것임.
+				.bodyToMono(Long.class) // 서버의 응답을 Long 클래스로 매핑(Transcode 서버의 응답)
+				.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(1000))) // 재시도 로직
+				.doOnError(error -> log.info("Transcoding 서버에서 다음의 에러가 발생했습니다 : " + error.getMessage()))
+				.onErrorComplete() // 에러가 발생해도 무시하고 onComplete 메서드 실행
+				.subscribe((s) -> sendStreamingIsOnAirToServiceServer(stream, s)));
+	}
+
+	private void sendStreamingIsOnAirToServiceServer(Stream stream, Long s) {
+		log.info("transcoding 서비스 구독 시작  pid : " + s.toString());
+		webClient
+			.post() // 비동기 post 요청
+			.uri(contentsServerIp + "/broadcasts/" + stream.getStreamName() + "/onair") // post 요청 uri (컨텐츠 서버)
+			.retrieve() // 응답 수신
+			.bodyToMono(Boolean.class) // 응답 형변환 (Boolean)
+			.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500))) // 재시도
+			.doOnError(e -> log.info(e.getMessage())) // 에러 정의
+			.onErrorReturn(Boolean.FALSE) // 에러 발생 시 스트림의 종료를 방지
+			.subscribeOn(Schedulers.parallel()) // contents 서버를 구독하는 작업이 병렬 스레드에서 실행되도록 설정(비동기적 실행, 기존 스레드를 차단하지 않음)
+			.subscribe((t) -> { // 비동기 작업 콜백 로깅
+				if (t) {
+					log.info("방송이 시작됩니다.");
+				} else {
+					log.info("ContentService 서버와 통신 에러 발생");
+				}
+			});
+	}
+
+
 
 	// rtmp 서버 원본
 	public void runWithAuthAndTrancodingException(String... args) {
@@ -152,6 +169,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 						.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
 						.doOnError(error -> log.info(error.getMessage()))
 						.onErrorReturn(Boolean.FALSE)
+						// 위의 결과로 ans를 받는다.
 						.flatMap(ans -> {
 							if (ans) {
 								log.info("스트리머 {} 의 stream key가 유효합니다.", stream.getStreamName());
@@ -186,7 +204,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 									})
 									.onErrorComplete()
 									.subscribe((s) -> {
-										log.info("Transcoding server started ffmpeg with pid " + s.toString());
+										log.info("Transcoding 서버를 구독합니다. " + s.toString());
 										webClient
 											.post()
 											.uri(authServerIp + "/broadcasts/" + stream.getStreamName() + "/onair")
