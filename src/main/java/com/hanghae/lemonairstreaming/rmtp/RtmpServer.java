@@ -6,8 +6,6 @@ import java.util.concurrent.CompletableFuture;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import com.hanghae.lemonairstreaming.Handler.ChunkDecoder;
@@ -15,7 +13,6 @@ import com.hanghae.lemonairstreaming.Handler.ChunkEncoder;
 import com.hanghae.lemonairstreaming.Handler.HandshakeHandler;
 import com.hanghae.lemonairstreaming.Handler.InboundConnectionLogger;
 import com.hanghae.lemonairstreaming.Handler.RtmpMessageHandler;
-import com.hanghae.lemonairstreaming.rmtp.entity.StreamKey;
 import com.hanghae.lemonairstreaming.rmtp.model.Stream;
 
 import io.netty.channel.ChannelOption;
@@ -23,7 +20,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.netty.DisposableServer;
@@ -54,8 +50,8 @@ public abstract class RtmpServer implements CommandLineRunner {
 	@Value("${external.service.server.port}")
 	private int ServiceServerPort;
 
-//	@Value("${external.auth.server.ip}")
-//	private String serviceServerIp;
+	//	@Value("${external.auth.server.ip}")
+	//	private String serviceServerIp;
 
 	@Value("${internal.rtmp.server.port}")
 	private int rtmpPort;
@@ -87,8 +83,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 				.addHandlerLast(getRtmpMessageHandler()))
 			.option(ChannelOption.SO_BACKLOG, 128) // 서버 소켓에 대한 설정 (연결 대기열의 최대 길이를 128로 설정)
 			.childOption(ChannelOption.SO_KEEPALIVE, true) // TCP keep-alive 옵션 활성화
-			.handle((in, out) -> in
-				.receiveObject() // 데이터 수신
+			.handle((in, out) -> in.receiveObject() // 데이터 수신
 				.cast(Stream.class)// Stream으로 형변환
 				.doOnError((e) -> log.error("지원하지 않는 스트림 데이터 형식입니다. obs studio를 사용하세요"))
 				.onErrorComplete()
@@ -97,7 +92,9 @@ public abstract class RtmpServer implements CommandLineRunner {
 					stream.sendPublishMessage();
 					requestTranscoding(stream);
 					return Mono.empty(); // rtmp 프로토콜로 들어온 영상 송출 요청에 대한 작업이 종료되었음을 나타낸다.
-				}).then()).bindNow(); // 서버의 환경 설정과 구독 관계 설정이 끝나면 서버가 BindNow된다.
+				})
+				.then())
+			.bindNow(); // 서버의 환경 설정과 구독 관계 설정이 끝나면 서버가 BindNow된다.
 		server.onDispose().block(); // .block()으로 서버가 onDispose()되어 Mono가 반환될때까지 기다린다.
 	}
 
@@ -122,8 +119,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 
 	private void sendStreamingIsOnAirToServiceServer(Stream stream, Long s) {
 		log.info("transcoding 서비스 구독 시작  pid : " + s.toString());
-		webClient
-			.post() // 비동기 post 요청
+		webClient.post() // 비동기 post 요청
 			.uri(serviceServerIp + "/api/streams/" + stream.getStreamName() + "/streaming") // post 요청 uri (컨텐츠 서버)
 			.retrieve() // 응답 수신
 			.bodyToMono(Boolean.class) // 응답 형변환 (Boolean)
