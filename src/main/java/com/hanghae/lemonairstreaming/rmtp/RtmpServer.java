@@ -72,12 +72,10 @@ public abstract class RtmpServer implements CommandLineRunner {
 		runWithExtractedMethod(args);
 	}
 
-
-	private void runWithExtractedMethod(String... args){
+	private void runWithExtractedMethod(String... args) {
 		DisposableServer server = TcpServer.create() // TCP 서버 생성
 			.port(rtmpPort) // RTMP 포트 설정 (1935)
-			.doOnBound(disposableServer -> // 서버가 바인드 되면 콜백 (시작 로깅)
-				log.info("RTMP 서버가 포트 {} 에서 시작됩니다.", disposableServer.port()))
+			.doOnBound(disposableServer -> log.info("RTMP 서버가 포트 {} 에서 시작됩니다.", disposableServer.port()))
 			.doOnConnection(connection -> connection // 각 연결에 대해 적용되는 핸들러 추가
 				.addHandlerLast(getInboundConnectionLogger())
 				.addHandlerLast(getHandshakeHandler())
@@ -86,10 +84,10 @@ public abstract class RtmpServer implements CommandLineRunner {
 				.addHandlerLast(getRtmpMessageHandler()))
 			.option(ChannelOption.SO_BACKLOG, 128) // 서버 소켓에 대한 설정 (연결 대기열의 최대 길이를 128로 설정)
 			.childOption(ChannelOption.SO_KEEPALIVE, true) // TCP keep-alive 옵션 활성화
-			.handle((in, out) -> in // 서버가 IO 이벤트를 처리하는 방식 정의
+			.handle((in, out) -> in
 				.receiveObject() // 데이터 수신
-				.cast(Stream.class)
-				.doOnError((e)-> log.error("지원하지 않는 스트림 데이터 형식입니다. obs studio를 사용하세요"))// Stream으로 형변환
+				.cast(Stream.class)// Stream으로 형변환
+				.doOnError((e) -> log.error("지원하지 않는 스트림 데이터 형식입니다. obs studio를 사용하세요"))
 				.onErrorComplete()
 				.flatMap(stream -> { // 각 스트림 객체에 대한 연산
 					log.info("스트리머 {} 의 stream key가 유효합니다.", stream.getStreamName());
@@ -98,7 +96,6 @@ public abstract class RtmpServer implements CommandLineRunner {
 					return Mono.empty(); // rtmp 프로토콜로 들어온 영상 송출 요청에 대한 작업이 종료되었음을 나타낸다.
 				}).then()).bindNow(); // 서버의 환경 설정과 구독 관계 설정이 끝나면 서버가 BindNow된다.
 		server.onDispose().block(); // .block()으로 서버가 onDispose()되어 Mono가 반환될때까지 기다린다.
-
 	}
 
 	private CompletableFuture<Void> requestTranscoding(Stream stream) {
@@ -138,99 +135,5 @@ public abstract class RtmpServer implements CommandLineRunner {
 					log.info("ContentService 서버와 통신 에러 발생");
 				}
 			});
-	}
-
-
-
-	// rtmp 서버 원본
-	public void runWithAuthAndTrancodingException(String... args) {
-		DisposableServer server = TcpServer.create()
-			.port(1935)
-			.doOnBound(disposableServer ->
-				log.info("RTMP 서버가 포트 {} 에서 시작됩니다.", disposableServer.port()))
-			.doOnConnection(connection -> connection
-				.addHandlerLast(getInboundConnectionLogger())
-				.addHandlerLast(getHandshakeHandler())
-				.addHandlerLast(getChunkDecoder())
-				.addHandlerLast(getChunkEncoder())
-				.addHandlerLast(getRtmpMessageHandler()))
-			.option(ChannelOption.SO_BACKLOG, 128)
-			.childOption(ChannelOption.SO_KEEPALIVE, true)
-			.handle((in, out) -> in
-				.receiveObject()
-				.cast(Stream.class)
-				.flatMap(stream -> {
-					return webClient
-						.post()
-						.uri(serviceServerIp + "/api/streams/" + stream.getStreamName() + "/check")
-						.body(Mono.just(new StreamKey(stream.getStreamKey())), StreamKey.class)
-						.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-						.retrieve()
-						.bodyToMono(Boolean.class).log()
-						.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
-						.doOnError(error -> log.info(error.getMessage()))
-						.onErrorReturn(Boolean.FALSE)
-						// 위의 결과로 ans를 받는다.
-						.flatMap(ans -> {
-							if (ans) {
-								log.info("스트리머 {} 의 stream key가 유효합니다.", stream.getStreamName());
-								stream.sendPublishMessage();
-								stream.getReadyToBroadcast().thenRun(() -> webClient
-									.get()
-									.uri(transcodingServerIp + ":" + transcodingServerPort + "/transcode/" + stream.getStreamName())
-									.retrieve()
-									.bodyToMono(Long.class)
-									.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(1000)))
-									.doOnError(error -> {
-										log.info("Transcoding 서버에서 다음의 에러가 발생했습니다 : " + error.getMessage());
-										webClient
-											.delete()
-											.uri(serviceServerIp + "/api/streams/" + stream.getStreamName() + "/streaming")
-											.retrieve()
-											.bodyToMono(Boolean.class)
-											.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
-											.doOnError(e -> log.info(e.getMessage()))
-											.onErrorReturn(Boolean.FALSE)
-											.subscribeOn(Schedulers.parallel())
-											.subscribe((s) -> {
-												log.info("방송 송출이 끊어집니다.");
-												if (s) {
-													log.info("방송이 종료됩니다.");
-												} else {
-													log.info("ContentService 서버와 통신 에러 발생");
-												}
-											});
-										stream.closeStream();
-										stream.getPublisher().disconnect();
-									})
-									.onErrorComplete()
-									.subscribe((s) -> {
-										log.info("Transcoding 서버를 구독합니다. " + s.toString());
-										webClient
-											.post()
-											.uri(serviceServerIp + "/api/streams/" + stream.getStreamName() + "/streaming")
-											.retrieve()
-											.bodyToMono(Boolean.class)
-											.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
-											.doOnError(e -> log.info(e.getMessage()))
-											.onErrorReturn(Boolean.FALSE)
-											.subscribeOn(Schedulers.parallel())
-											.subscribe((t) -> {
-												if (t) {
-													log.info("방송이 시작됩니다.");
-												} else {
-													log.info("Service 서버와 통신 에러 발생");
-												}
-											});
-									}));
-							} else {
-								stream.getPublisher().disconnect();
-							}
-							return Mono.empty();
-						});
-				})
-				.then())
-			.bindNow(); // runner로 돌아가는 rtmp 서버 유지
-		server.onDispose().block();
 	}
 }
