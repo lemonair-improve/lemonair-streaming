@@ -22,7 +22,7 @@ public class ChunkEncoder extends MessageToByteEncoder<RtmpMessage> {
 	// RTMP message의 header 타입에 따라 분기 처리
 	@Override
 	protected void encode(ChannelHandlerContext channelHandlerContext, RtmpMessage message, ByteBuf byteBuf) {
-		log.info("message.header().getType() : " + message.header().getType());
+		// log.info("message.header().getType() : " + message.header().getType()); // rtmp요청으로 어떤 타입이 들어오는지 확인하는 로그
 		switch (message.header().getType()) {
 			case RtmpConstants.RTMP_MSG_CONTROL_TYPE_SET_CHUNK_SIZE -> handleSetChunkSize(message, byteBuf);
 			case RtmpConstants.RTMP_MSG_USER_CONTROL_TYPE_AUDIO -> handleAudioMessage(message, byteBuf);
@@ -82,7 +82,7 @@ public class ChunkEncoder extends MessageToByteEncoder<RtmpMessage> {
 	// Fmt 0이 필요로 하는 정보들을 채우고 메시지 형식을 생성
 	private void encodeFmt0(RtmpMessage message, ByteBuf buf) {
 
-		log.info("encodeFmt0");
+		// log.info("encodeFmt0");
 		boolean extendedTimestamp = false;
 
 		int cid = message.header().getCid();
@@ -111,7 +111,7 @@ public class ChunkEncoder extends MessageToByteEncoder<RtmpMessage> {
 	}
 
 	private void encodeFmt1(RtmpMessage message, ByteBuf buf) {
-		log.info("encodeFmt1");
+		// log.info("encodeFmt1");
 
 		int cid = message.header().getCid();
 		byte[] basicHeader = encodeFmtAndChunkId(RtmpConstants.RTMP_CHUNK_TYPE_1, cid);
@@ -126,7 +126,7 @@ public class ChunkEncoder extends MessageToByteEncoder<RtmpMessage> {
 	}
 
 	private void encodeFmt3(RtmpMessage message, ByteBuf buf) {
-		log.info("encodeFmt3");
+		// log.info("encodeFmt3");
 
 		int cid = message.header().getCid();
 		byte[] basicHeader = encodeFmtAndChunkId(RtmpConstants.RTMP_CHUNK_TYPE_3, cid);

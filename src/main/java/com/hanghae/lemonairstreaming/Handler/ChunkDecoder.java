@@ -183,7 +183,7 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
             // header type이 3인 경우 이전 헤더와 동일한 경우로써 다른 작업이 필요하지 않음
 			case RtmpConstants.RTMP_CHUNK_TYPE_3 -> {
 				/* Do nothing */
-				log.info("RTMP_CHUNK_TYPE_3");
+				// log.info("RTMP_CHUNK_TYPE_3");
 			}
 			default -> {
 				log.error("readHeader 함수에서 switch문에 걸리지 않음");
