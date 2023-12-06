@@ -99,6 +99,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 	}
 
 	private CompletableFuture<Void> requestTranscoding(Stream stream) {
+		System.out.println("transcodingServerIp = " + transcodingServerIp);
 		return stream.getReadyToBroadcast()
 			.thenRun(() -> webClient // 스트림이 방송을 시작할 준비가 되었을 때 실행, webClient를 이용하여 비동기 get 요청
 				.get()
