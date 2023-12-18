@@ -220,7 +220,7 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 			ctx.writeAndFlush(MessageProvider.onStatus("status", "NetStream.Unpublish.Success", "Stop publishing"));
 			webClient
 				.post()
-				.uri(authAddress + "/broadcasts/" + stream.getStreamName() + "/offair")
+				.uri(authAddress + "/broadcasts/" + stream.getStreamerId() + "/offair")
 				.retrieve()
 				.bodyToMono(Boolean.class)
 				.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
@@ -235,7 +235,7 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 					}
 				});
 			stream.closeStream();
-			context.deleteStream(stream.getStreamName());
+			context.deleteStream(stream.getStreamerId());
 			ctx.close();
 		} else {
 			log.info("Subscriber closed stream");

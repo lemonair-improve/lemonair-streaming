@@ -29,7 +29,7 @@ public class Stream {
 	private Channel publisher;
 
 	private final Set<Channel> subscribers;
-	private final String streamName;
+	private final String streamerId;
 	private String streamKey;
 
 	private final BlockingQueue<RtmpMediaMessage> rtmpGopCache;
@@ -39,8 +39,8 @@ public class Stream {
 
 	private CompletableFuture<Boolean> readyToBroadcast;
 
-	public Stream(String streamName) {
-		this.streamName = streamName;
+	public Stream(String streamerId) {
+		this.streamerId = streamerId;
 		this.subscribers = new LinkedHashSet<>();
 		this.rtmpGopCache = new ArrayBlockingQueue<>(1024); // Group of Pictures 동영상 압축 기법 1024 화질인 듯
 		this.readyToBroadcast = new CompletableFuture<>();
@@ -91,7 +91,7 @@ public class Stream {
 	// 비디오, 오디오 구성 전송
 	// gop 캐시된 rtmp 메시지 전송
 	public void addSubscriber(Channel channel) {
-		log.info("Subscriber {} added to stream {}", channel.remoteAddress(), streamName);
+		log.info("Subscriber {} added to stream {}", channel.remoteAddress(), streamerId);
 		subscribers.add(channel);
 
 		channel.writeAndFlush(RtmpMediaMessage.toRtmpMessage(videoConfig));

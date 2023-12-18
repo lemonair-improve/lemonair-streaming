@@ -18,11 +18,7 @@ repositories {
 dependencies {
     // rsocket
     implementation 'org.springframework.boot:spring-boot-starter-rsocket'
-
-    // r2dbc MySQL 종속성
-
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
-
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
