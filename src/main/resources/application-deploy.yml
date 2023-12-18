@@ -1,5 +1,0 @@
-external:
-  transcoding:
-    server:
-      ip: http://workspace-lemonair-transcoding-1
-#      ip: http://172.18.0.2

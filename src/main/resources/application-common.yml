@@ -20,6 +20,3 @@ external:
 
 ec2:
   server: 127.0.0.1
-
-settings:
-  max-connections: 128

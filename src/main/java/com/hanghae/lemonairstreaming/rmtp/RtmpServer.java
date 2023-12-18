@@ -52,10 +52,6 @@ public abstract class RtmpServer implements CommandLineRunner {
 	@Value("${internal.rtmp.server.port}")
 	private int rtmpPort;
 
-
-	@Value("${settings.max-connections}")
-	private int maxConnections;
-
 	protected abstract RtmpMessageHandler getRtmpMessageHandler();
 
 	protected abstract InboundConnectionLogger getInboundConnectionLogger();
@@ -81,7 +77,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 				.addHandlerLast(getChunkDecoder())
 				.addHandlerLast(getChunkEncoder())
 				.addHandlerLast(getRtmpMessageHandler()))
-			.option(ChannelOption.SO_BACKLOG, maxConnections) // 서버 소켓에 대한 설정 (연결 대기열의 최대 길이를 128로 설정)
+			.option(ChannelOption.SO_BACKLOG, 128) // 서버 소켓에 대한 설정 (연결 대기열의 최대 길이를 128로 설정)
 			.childOption(ChannelOption.SO_KEEPALIVE, true) // TCP keep-alive 옵션 활성화
 			.handle((in, out) -> in.receiveObject() // 데이터 수신
 				.cast(Stream.class)// Stream으로 형변환
