@@ -32,26 +32,22 @@ import reactor.util.retry.Retry;
 @Slf4j
 public abstract class RtmpServer implements CommandLineRunner {
 
-	// Spring의 WebClient를 주입합니다.
 	// WebFlux에서 제공하는 비동기 HTTP 클라이언트
 	@Autowired
 	private WebClient webClient;
+
 	// MSA 관련 설정
-	//transcoding.server 프로퍼티 값을 주입합니다. 트랜스코딩 서버 주소를 나타냅니다.
 	@Value("${external.transcoding.server.ip}")
 	private String transcodingServerIp;
 
 	@Value("${external.transcoding.server.port}")
 	private int transcodingServerPort;
-	//auth.server 프로퍼티 값을 주입합니다. 인증 서버 주소를 나타냅니다.
+
 	@Value("${external.service.server.ip}")
 	private String serviceServerIp;
 
 	@Value("${external.service.server.port}")
 	private int ServiceServerPort;
-
-	//	@Value("${external.auth.server.ip}")
-	//	private String serviceServerIp;
 
 	@Value("${internal.rtmp.server.port}")
 	private int rtmpPort;
@@ -88,10 +84,10 @@ public abstract class RtmpServer implements CommandLineRunner {
 				.doOnError((e) -> log.error("지원하지 않는 스트림 데이터 형식입니다. obs studio를 사용하세요"))
 				.onErrorComplete()
 				.flatMap(stream -> { // 각 스트림 객체에 대한 연산
-					log.info("스트리머 {} 의 stream key가 유효합니다.", stream.getStreamName());
+					log.info("스트리머 {} 의 stream key가 유효합니다.", stream.getStreamerId());
 					stream.sendPublishMessage();
 					requestTranscoding(stream);
-					return Mono.empty(); // rtmp 프로토콜로 들어온 영상 송출 요청에 대한 작업이 종료되었음을 나타낸다.
+					return Mono.empty(); // rtmp서버안에서 처리해야할 일들을 모두 처리했을 때
 				})
 				.then())
 			.bindNow(); // 서버의 환경 설정과 구독 관계 설정이 끝나면 서버가 BindNow된다.
@@ -99,16 +95,15 @@ public abstract class RtmpServer implements CommandLineRunner {
 	}
 
 	private CompletableFuture<Void> requestTranscoding(Stream stream) {
+		System.out.println("transcodingServerIp = " + transcodingServerIp);
 		return stream.getReadyToBroadcast()
-			.thenRun(() -> webClient // 스트림이 방송을 시작할 준비가 되었을 때 실행, webClient를 이용하여 비동기 get 요청
+			.thenRun(() ->
+
+				webClient // 스트림이 방송을 시작할 준비가 되었을 때 실행, webClient를 이용하여 비동기 get 요청
 				.get()
-				//문제 발생 예상 코드 아래로 접속 요청을 보내는데, 아래 .retryWhen에서 정의한 3번의 재시도가 모두 실패했다는 Retries wchausted: 3/3 오류가 발생한다.
 				.uri(transcodingServerIp + ":" + transcodingServerPort + "/transcode/"
-					+ stream.getStreamName()) // get요청을 보내는 uri
+					+ stream.getStreamerId()) // get요청을 보내는 uri
 				.retrieve() // 응답 수신
-				// transcoding service의 응답은 받은 이후 사용되지 않으며
-				// 그냥 응답이 오는지 안오는지가 중요하다.
-				// 응답이 정상적으로 온다면 트랜스코딩이 계속해서 진행중,
 				// 응답이 정상적으로 오지 않는다면 트랜스코딩 서버에서 문제가 발생한 것임.
 				.bodyToMono(Long.class) // 서버의 응답을 Long 클래스로 매핑(Transcode 서버의 응답)
 				.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(1000))) // 재시도 로직
@@ -120,7 +115,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 	private void sendStreamingIsOnAirToServiceServer(Stream stream, Long s) {
 		log.info("transcoding 서비스 구독 시작  pid : " + s.toString());
 		webClient.post() // 비동기 post 요청
-			.uri(serviceServerIp + "/api/streams/" + stream.getStreamName() + "/streaming") // post 요청 uri (컨텐츠 서버)
+			.uri(serviceServerIp + "/api/streams/" + stream.getStreamerId() + "/streaming") // post 요청 uri (컨텐츠 서버)
 			.retrieve() // 응답 수신
 			.bodyToMono(Boolean.class) // 응답 형변환 (Boolean)
 			.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500))) // 재시도

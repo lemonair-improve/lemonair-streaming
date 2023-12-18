@@ -85,6 +85,9 @@ public class HandshakeHandler extends ByteToMessageDecoder {
 		// Write random 1528 bytes
 		resp.writeBytes(randomBytes(RtmpConstants.RTMP_HANDSHAKE_SIZE - 8));
 
+		// timestamp(4byte)
+		// 0(4byte)
+		// random(1528byte)
 		// S2
 		// Write timestamp
 		resp.writeInt(timestamp);

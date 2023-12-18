@@ -11,7 +11,7 @@ public class StreamContext {
 	}
 
 	public void addStream(Stream stream) {
-		context.put(stream.getStreamName(), stream);
+		context.put(stream.getStreamerId(), stream);
 	}
 
 	public void deleteStream(String streamName) {

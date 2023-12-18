@@ -1,4 +1,0 @@
-external:
-  transcoding:
-    server:
-      ip: workspace-lemonair-transcoding-1
