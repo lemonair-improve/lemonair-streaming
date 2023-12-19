@@ -80,7 +80,7 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 	private void handleCommand(ChannelHandlerContext ctx, ByteBuf payload, List<Object> out) {
 		List<Object> decoded = Amf0Rules.decodeAll(payload);
 		String command = (String)decoded.get(0);
-		log.info("handleCommand method :" + command + ">>>" + decoded);
+		log.info("handleCommand method :" +  command + ">>>" + decoded);
 		switch (command) {
 			case "connect" -> onConnect(ctx, decoded);
 			case "createStream" -> onCreate(ctx, decoded);
@@ -91,6 +91,7 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 			default -> log.info("Unsupported command type {}", command);
 		}
 	}
+
 
 	// RtmpConstants.RTMP_MSG_COMMAND_TYPE_AMF0 명령어가 connect일 때 수행하는 메서드
 	// 연결을 처리하는 과정
@@ -217,11 +218,9 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 			ctx.writeAndFlush(MessageProvider.onStatus("status", "NetStream.Unpublish.Success", "Stop publishing"));
 		} else if (ctx.channel().id().equals(stream.getPublisher().id())) {
 			ctx.writeAndFlush(MessageProvider.onStatus("status", "NetStream.Unpublish.Success", "Stop publishing"));
-
 			webClient
 				.post()
-				.uri(serviceServerIp + ":" +serviceServerPort + "/api/rtmp/streams/" + stream.getStreamerId() + "/stop")
-
+				.uri(serviceServerIp + ":" +serviceServerPort + "/api/streams/" + stream.getStreamerId() + "/offair")
 				.retrieve()
 				.bodyToMono(Boolean.class)
 				.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
