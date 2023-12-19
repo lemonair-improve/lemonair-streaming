@@ -47,7 +47,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 	private String serviceServerIp;
 
 	@Value("${external.service.server.port}")
-	private int ServiceServerPort;
+	private int serviceServerPort;
 
 	@Value("${internal.rtmp.server.port}")
 	private int rtmpPort;
@@ -95,7 +95,6 @@ public abstract class RtmpServer implements CommandLineRunner {
 	}
 
 	private CompletableFuture<Void> requestTranscoding(Stream stream) {
-		System.out.println("transcodingServerIp = " + transcodingServerIp);
 		return stream.getReadyToBroadcast()
 			.thenRun(() ->
 
@@ -114,10 +113,12 @@ public abstract class RtmpServer implements CommandLineRunner {
 
 	private void sendStreamingIsOnAirToServiceServer(Stream stream, Long s) {
 		log.info("transcoding 서비스 구독 시작  pid : " + s.toString());
+		log.info(serviceServerIp + "/api/rtmp/streams/" + stream.getStreamerId() + "/streaming");
 		webClient.post() // 비동기 post 요청
-			.uri(serviceServerIp + "/api/streams/" + stream.getStreamerId() + "/streaming") // post 요청 uri (컨텐츠 서버)
+			.uri(serviceServerIp+":"+serviceServerPort + "/api/rtmp/streams/" + stream.getStreamerId() + "/streaming") // post 요청 uri (컨텐츠 서버)
 			.retrieve() // 응답 수신
 			.bodyToMono(Boolean.class) // 응답 형변환 (Boolean)
+			.log()
 			.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500))) // 재시도
 			.doOnError(e -> log.info(e.getMessage())) // 에러 정의
 			.onErrorReturn(Boolean.FALSE) // 에러 발생 시 스트림의 종료를 방지
