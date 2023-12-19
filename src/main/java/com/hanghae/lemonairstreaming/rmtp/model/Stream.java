@@ -73,7 +73,7 @@ public class Stream {
 	// 스트림에서 수신된 미디어 메시지를 스트림을 구독하는 모든 채널에 브로드캐스팅
 	public void broadcastMessage(RtmpMediaMessage message) {
 		if (!readyToBroadcast.isDone()) {
-			//여기서 readyToBroadcast될때까지 기다렸다가 Transcoding server로 요청을 시작한다.ㄴ
+			//여기서 readyToBroadcast될때까지 기다렸다가 Transcoding server로 요청을 시작한다.
 			readyToBroadcast.complete(Boolean.TRUE);
 		}
 		Iterator<Channel> channelIterator = subscribers.iterator();
