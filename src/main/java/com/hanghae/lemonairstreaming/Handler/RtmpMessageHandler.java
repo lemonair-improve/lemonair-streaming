@@ -36,8 +36,7 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 	private String serviceServerIp;
 
 	@Value("${external.service.server.port}")
-	private String serviceServerPort;
-
+	private int serviceServerPort;
 	public RtmpMessageHandler(StreamContext context) {
 		this.context = context;
 	}
@@ -218,9 +217,11 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 			ctx.writeAndFlush(MessageProvider.onStatus("status", "NetStream.Unpublish.Success", "Stop publishing"));
 		} else if (ctx.channel().id().equals(stream.getPublisher().id())) {
 			ctx.writeAndFlush(MessageProvider.onStatus("status", "NetStream.Unpublish.Success", "Stop publishing"));
-			webClient.post()
-				.uri(serviceServerIp + ":" + serviceServerPort + "/api/rtmp/streams/" + stream.getStreamerId()
-					+ "/offair")
+
+			webClient
+				.post()
+				.uri(serviceServerIp + ":" +serviceServerPort + "/api/rtmp/streams/" + stream.getStreamerId() + "/stop")
+
 				.retrieve()
 				.bodyToMono(Boolean.class)
 				.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))

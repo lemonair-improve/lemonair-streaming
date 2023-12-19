@@ -124,14 +124,14 @@ public abstract class RtmpServer implements CommandLineRunner {
 				.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(1000))) // 재시도 로직
 				.doOnError(error -> log.info("Transcoding 서버에서 다음의 에러가 발생했습니다 : " + error.getMessage()))
 				.onErrorComplete() // 에러가 발생해도 무시하고 onComplete 메서드 실행
-				.subscribe((s) -> sendStreamingIsOnAirToServiceServer(stream, s)));
+				.subscribe((s) -> sendStreamingIsReadyToServiceServer(stream, s)));
 	}
 
-	private void sendStreamingIsOnAirToServiceServer(Stream stream, Long s) {
+	private void sendStreamingIsReadyToServiceServer(Stream stream, Long s) {
 		log.info("transcoding 서비스 구독 시작  pid : " + s.toString());
 		log.info(serviceServerIp + "/api/rtmp/streams/" + stream.getStreamerId() + "/onair");
 		webClient.post() // 비동기 post 요청
-			.uri(serviceServerIp+":"+serviceServerPort + "/api/rtmp/streams/" + stream.getStreamerId() + "/onair") // post 요청 uri (컨텐츠 서버)
+			.uri(serviceServerIp+":"+serviceServerPort + "/api/rtmp/streams/" + stream.getStreamerId() + "/ready") // post 요청 uri (컨텐츠 서버)
 			.retrieve() // 응답 수신
 			.bodyToMono(Boolean.class) // 응답 형변환 (Boolean)
 			.log()
