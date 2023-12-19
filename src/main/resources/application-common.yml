@@ -13,10 +13,6 @@ external:
     server:
       ip: http://localhost
       port: 8081
-  auth:
-    server:
-      ip: http://localhost
-      port: 8080
 
 ec2:
   server: 127.0.0.1

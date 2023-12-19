@@ -33,10 +33,11 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 	WebClient webClient;
 	private String currentSessionStream;
 
-	// 외부 인증 서버?
-	@Value("${external.auth.server.ip}")
-	private String authAddress;
+	@Value("${external.service.server.ip}")
+	private String serviceServerIp;
 
+	@Value("${external.service.server.port}")
+	private int serviceServerPort;
 	public RtmpMessageHandler(StreamContext context) {
 		this.context = context;
 	}
@@ -220,7 +221,7 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 			ctx.writeAndFlush(MessageProvider.onStatus("status", "NetStream.Unpublish.Success", "Stop publishing"));
 			webClient
 				.post()
-				.uri(authAddress + "/broadcasts/" + stream.getStreamerId() + "/offair")
+				.uri(serviceServerIp + ":" +serviceServerPort + "/api/rtmp/streams/" + stream.getStreamerId() + "/stop")
 				.retrieve()
 				.bodyToMono(Boolean.class)
 				.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
