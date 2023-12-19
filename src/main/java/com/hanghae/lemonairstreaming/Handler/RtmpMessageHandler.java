@@ -24,7 +24,6 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.retry.Retry;
 
-
 @Slf4j
 public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 
@@ -33,9 +32,11 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 	WebClient webClient;
 	private String currentSessionStream;
 
-	// 외부 인증 서버?
-	@Value("${external.auth.server.ip}")
-	private String authAddress;
+	@Value("${external.service.server.ip}")
+	private String serviceServerIp;
+
+	@Value("${external.service.server.port}")
+	private String serviceServerPort;
 
 	public RtmpMessageHandler(StreamContext context) {
 		this.context = context;
@@ -80,7 +81,7 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 	private void handleCommand(ChannelHandlerContext ctx, ByteBuf payload, List<Object> out) {
 		List<Object> decoded = Amf0Rules.decodeAll(payload);
 		String command = (String)decoded.get(0);
-		log.info("handleCommand method :" +  command + ">>>" + decoded);
+		log.info("handleCommand method :" + command + ">>>" + decoded);
 		switch (command) {
 			case "connect" -> onConnect(ctx, decoded);
 			case "createStream" -> onCreate(ctx, decoded);
@@ -91,7 +92,6 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 			default -> log.info("Unsupported command type {}", command);
 		}
 	}
-
 
 	// RtmpConstants.RTMP_MSG_COMMAND_TYPE_AMF0 명령어가 connect일 때 수행하는 메서드
 	// 연결을 처리하는 과정
@@ -218,9 +218,9 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 			ctx.writeAndFlush(MessageProvider.onStatus("status", "NetStream.Unpublish.Success", "Stop publishing"));
 		} else if (ctx.channel().id().equals(stream.getPublisher().id())) {
 			ctx.writeAndFlush(MessageProvider.onStatus("status", "NetStream.Unpublish.Success", "Stop publishing"));
-			webClient
-				.post()
-				.uri(authAddress + "/broadcasts/" + stream.getStreamerId() + "/offair")
+			webClient.post()
+				.uri(serviceServerIp + ":" + serviceServerPort + "/api/rtmp/streams/" + stream.getStreamerId()
+					+ "/offair")
 				.retrieve()
 				.bodyToMono(Boolean.class)
 				.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))

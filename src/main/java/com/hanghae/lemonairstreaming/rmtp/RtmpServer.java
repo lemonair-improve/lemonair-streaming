@@ -89,7 +89,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 				.flatMap(stream -> { // 각 스트림 객체에 대한 연산
 					return webClient
 						.post()
-						.uri(serviceServerIp +":"+serviceServerPort+ "/api/rtmp/" + stream.getStreamerId() + "/check")
+						.uri(serviceServerIp +":"+serviceServerPort+ "/api/rtmp/streams/" + stream.getStreamerId() + "/check")
 						.body(Mono.just(new StreamKey(stream.getStreamKey())), StreamKey.class)
 						.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
 						.retrieve()
@@ -97,6 +97,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 						.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
 						.doOnError(error -> log.info(error.getMessage()))
 						.onErrorReturn(Boolean.FALSE)
+						.filter(isStreamKeyValid-> isStreamKeyValid)
 						.flatMap(isStreamKeyValid->{
 							log.info("스트리머 {} 의 stream key가 유효합니다.", stream.getStreamerId());
 							stream.sendPublishMessage();
@@ -128,9 +129,9 @@ public abstract class RtmpServer implements CommandLineRunner {
 
 	private void sendStreamingIsOnAirToServiceServer(Stream stream, Long s) {
 		log.info("transcoding 서비스 구독 시작  pid : " + s.toString());
-		log.info(serviceServerIp + "/api/rtmp/streams/" + stream.getStreamerId() + "/streaming");
+		log.info(serviceServerIp + "/api/rtmp/streams/" + stream.getStreamerId() + "/onair");
 		webClient.post() // 비동기 post 요청
-			.uri(serviceServerIp+":"+serviceServerPort + "/api/rtmp/streams/" + stream.getStreamerId() + "/streaming") // post 요청 uri (컨텐츠 서버)
+			.uri(serviceServerIp+":"+serviceServerPort + "/api/rtmp/streams/" + stream.getStreamerId() + "/onair") // post 요청 uri (컨텐츠 서버)
 			.retrieve() // 응답 수신
 			.bodyToMono(Boolean.class) // 응답 형변환 (Boolean)
 			.log()
