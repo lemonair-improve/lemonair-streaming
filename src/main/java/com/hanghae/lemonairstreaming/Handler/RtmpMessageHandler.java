@@ -221,7 +221,7 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 			ctx.writeAndFlush(MessageProvider.onStatus("status", "NetStream.Unpublish.Success", "Stop publishing"));
 			webClient
 				.post()
-				.uri(serviceServerIp + ":" +serviceServerPort + "/api/rtmp/streams/" + stream.getStreamerId() + "/stop")
+				.uri(serviceServerIp + ":" +serviceServerPort + "/api/streams/" + stream.getStreamerId() + "/offair")
 				.retrieve()
 				.bodyToMono(Boolean.class)
 				.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))

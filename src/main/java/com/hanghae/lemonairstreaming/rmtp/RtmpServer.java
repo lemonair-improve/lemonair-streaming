@@ -113,9 +113,9 @@ public abstract class RtmpServer implements CommandLineRunner {
 
 	private void sendStreamingIsReadyToServiceServer(Stream stream, Long s) {
 		log.info("transcoding 서비스 구독 시작  pid : " + s.toString());
-		log.info(serviceServerIp + "/api/rtmp/streams/" + stream.getStreamerId() + "/streaming");
+		log.info(serviceServerIp + "/api/streams/" + stream.getStreamerId() + "/onair");
 		webClient.post() // 비동기 post 요청
-			.uri(serviceServerIp+":"+serviceServerPort + "/api/rtmp/streams/" + stream.getStreamerId() + "/ready") // post 요청 uri (컨텐츠 서버)
+			.uri(serviceServerIp+":"+serviceServerPort + "/api/streams/" + stream.getStreamerId() + "/onair") // post 요청 uri (컨텐츠 서버)
 			.retrieve() // 응답 수신
 			.bodyToMono(Boolean.class) // 응답 형변환 (Boolean)
 			.log()
