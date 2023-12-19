@@ -6,6 +6,8 @@ import java.util.concurrent.CompletableFuture;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import com.hanghae.lemonairstreaming.Handler.ChunkDecoder;
@@ -13,6 +15,7 @@ import com.hanghae.lemonairstreaming.Handler.ChunkEncoder;
 import com.hanghae.lemonairstreaming.Handler.HandshakeHandler;
 import com.hanghae.lemonairstreaming.Handler.InboundConnectionLogger;
 import com.hanghae.lemonairstreaming.Handler.RtmpMessageHandler;
+import com.hanghae.lemonairstreaming.rmtp.entity.StreamKey;
 import com.hanghae.lemonairstreaming.rmtp.model.Stream;
 
 import io.netty.channel.ChannelOption;
@@ -84,10 +87,22 @@ public abstract class RtmpServer implements CommandLineRunner {
 				.doOnError((e) -> log.error("지원하지 않는 스트림 데이터 형식입니다. obs studio를 사용하세요"))
 				.onErrorComplete()
 				.flatMap(stream -> { // 각 스트림 객체에 대한 연산
-					log.info("스트리머 {} 의 stream key가 유효합니다.", stream.getStreamerId());
-					stream.sendPublishMessage();
-					requestTranscoding(stream);
-					return Mono.empty(); // rtmp서버안에서 처리해야할 일들을 모두 처리했을 때
+					return webClient
+						.post()
+						.uri(serviceServerIp +":"+serviceServerPort+ "/api/rtmp/" + stream.getStreamerId() + "/check")
+						.body(Mono.just(new StreamKey(stream.getStreamKey())), StreamKey.class)
+						.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+						.retrieve()
+						.bodyToMono(Boolean.class).log()
+						.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
+						.doOnError(error -> log.info(error.getMessage()))
+						.onErrorReturn(Boolean.FALSE)
+						.flatMap(isStreamKeyValid->{
+							log.info("스트리머 {} 의 stream key가 유효합니다.", stream.getStreamerId());
+							stream.sendPublishMessage();
+							requestTranscoding(stream);
+							return Mono.empty();
+						});
 				})
 				.then())
 			.bindNow(); // 서버의 환경 설정과 구독 관계 설정이 끝나면 서버가 BindNow된다.
