@@ -120,16 +120,15 @@ public abstract class RtmpServer implements CommandLineRunner {
 					+ stream.getStreamerId()) // get요청을 보내는 uri
 				.retrieve() // 응답 수신
 				// 응답이 정상적으로 오지 않는다면 트랜스코딩 서버에서 문제가 발생한 것임.
-				.bodyToMono(Long.class) // 서버의 응답을 Long 클래스로 매핑(Transcode 서버의 응답)
+				.bodyToMono(Long.class)
 				.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(1000))) // 재시도 로직
 				.doOnError(error -> log.info("Transcoding 서버에서 다음의 에러가 발생했습니다 : " + error.getMessage()))
 				.onErrorComplete() // 에러가 발생해도 무시하고 onComplete 메서드 실행
-				.subscribe((s) -> sendStreamingIsReadyToServiceServer(stream, s)));
+				.subscribe((ffmpegProcessPid) -> sendStreamingIsReadyToServiceServer(stream, ffmpegProcessPid)));
 	}
 
-	private void sendStreamingIsReadyToServiceServer(Stream stream, Long s) {
-		log.info("transcoding 서비스 구독 시작  pid : " + s.toString());
-		log.info(serviceServerIp + "/api/streams/" + stream.getStreamerId() + "/onair");
+	private void sendStreamingIsReadyToServiceServer(Stream stream, Long ffmpegProcessPid) {
+		log.info("ffmpeg Process pid : " + ffmpegProcessPid);
 		webClient.post() // 비동기 post 요청
 			.uri(serviceServerIp+":"+serviceServerPort + "/api/streams/" + stream.getStreamerId() + "/onair") // post 요청 uri (컨텐츠 서버)
 			.retrieve() // 응답 수신

@@ -61,6 +61,7 @@ public class Stream {
 			}
 			// clear interFrames queue
 			// keyframe은 독립적인 이미지 정보이기 때문에 이전에 쌓인 gop 캐시를 지워준다
+			// 이전 gop 캐시를 지우지 않으면 rtmp 프로토콜로 들어오는 영상이 Stream 객체로 캐스팅할 수 없다.
 			if (message.isKeyframe()) {
 				log.info("Keyframe added. {} frames cleared", rtmpGopCache.size());
 				rtmpGopCache.clear();
