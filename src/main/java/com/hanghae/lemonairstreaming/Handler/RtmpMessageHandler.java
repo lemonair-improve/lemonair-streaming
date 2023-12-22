@@ -70,7 +70,7 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 	protected void decode(ChannelHandlerContext channelHandlerContext, RtmpMessage in, List<Object> out) {
 		short type = in.header().getType();
 		ByteBuf payload = in.payload();
-		log.info("type : " + type);
+		// log.info("type : " + type);
 		switch (type) {
 			case RtmpConstants.RTMP_MSG_COMMAND_TYPE_AMF0 -> handleCommand(channelHandlerContext, payload, out);
 			case RtmpConstants.RTMP_MSG_DATA_TYPE_AMF0 -> handleData(payload);
@@ -252,10 +252,11 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 	}
 
 	private Mono<Boolean> requestOffAirToTranscodingServer(Stream stream) {
-		return webClient.post()
-			.uri(transcodingServerIp + ":" + transcodingServerPort + "/offair/" + stream.getStreamerId())
+		return webClient.get()
+			.uri(transcodingServerIp + ":" + transcodingServerPort + "/transcode/" + stream.getStreamerId() +"/offair")
 			.retrieve()
 			.bodyToMono(Boolean.class)
+			.log()
 			.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
 			.doOnError(e -> log.info(e.getMessage()))
 			.onErrorReturn(Boolean.FALSE);
@@ -266,6 +267,7 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 			.uri(serviceServerIp + ":" + serviceServerPort + "/api/streams/" + stream.getStreamerId() + "/offair")
 			.retrieve()
 			.bodyToMono(Boolean.class)
+			.log()
 			.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
 			.doOnError(e -> log.info(e.getMessage()))
 			.onErrorReturn(Boolean.FALSE);
