@@ -71,6 +71,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 	}
 
 	private void runWithExtractedMethod(String... args) {
+		// Netty Server Bootstrap 정의
 		DisposableServer server = TcpServer.create() // TCP 서버 생성
 			.port(rtmpPort) // RTMP 포트 설정 (1935)
 			.doOnBound(disposableServer -> log.info("RTMP 서버가 포트 {} 에서 시작됩니다.", disposableServer.port()))
