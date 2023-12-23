@@ -21,6 +21,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageDecoder;
 import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.retry.Retry;
 
@@ -37,6 +38,14 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 
 	@Value("${external.service.server.port}")
 	private int serviceServerPort;
+
+	// MSA 관련 설정
+	@Value("${external.transcoding.server.ip}")
+	private String transcodingServerIp;
+
+	@Value("${external.transcoding.server.port}")
+	private int transcodingServerPort;
+
 	public RtmpMessageHandler(StreamContext context) {
 		this.context = context;
 	}
@@ -61,12 +70,12 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 	protected void decode(ChannelHandlerContext channelHandlerContext, RtmpMessage in, List<Object> out) {
 		short type = in.header().getType();
 		ByteBuf payload = in.payload();
-
+		// log.info("type : " + type);
 		switch (type) {
 			case RtmpConstants.RTMP_MSG_COMMAND_TYPE_AMF0 -> handleCommand(channelHandlerContext, payload, out);
 			case RtmpConstants.RTMP_MSG_DATA_TYPE_AMF0 -> handleData(payload);
-			case RtmpConstants.RTMP_MSG_USER_CONTROL_TYPE_AUDIO,
-				RtmpConstants.RTMP_MSG_USER_CONTROL_TYPE_VIDEO -> handleMedia(in);
+			case RtmpConstants.RTMP_MSG_USER_CONTROL_TYPE_AUDIO, RtmpConstants.RTMP_MSG_USER_CONTROL_TYPE_VIDEO ->
+				handleMedia(in);
 			case RtmpConstants.RTMP_MSG_USER_CONTROL_TYPE_EVENT -> handleEvent(in);
 			default -> log.info("Unsupported message/ Type id: {}", type);
 		}
@@ -80,7 +89,7 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 	private void handleCommand(ChannelHandlerContext ctx, ByteBuf payload, List<Object> out) {
 		List<Object> decoded = Amf0Rules.decodeAll(payload);
 		String command = (String)decoded.get(0);
-		log.info("handleCommand method :" +  command + ">>>" + decoded);
+		log.info("handleCommand method :" + command + ">>>" + decoded);
 		switch (command) {
 			case "connect" -> onConnect(ctx, decoded);
 			case "createStream" -> onCreate(ctx, decoded);
@@ -91,7 +100,6 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 			default -> log.info("Unsupported command type {}", command);
 		}
 	}
-
 
 	// RtmpConstants.RTMP_MSG_COMMAND_TYPE_AMF0 명령어가 connect일 때 수행하는 메서드
 	// 연결을 처리하는 과정
@@ -218,22 +226,23 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 			ctx.writeAndFlush(MessageProvider.onStatus("status", "NetStream.Unpublish.Success", "Stop publishing"));
 		} else if (ctx.channel().id().equals(stream.getPublisher().id())) {
 			ctx.writeAndFlush(MessageProvider.onStatus("status", "NetStream.Unpublish.Success", "Stop publishing"));
-			webClient
-				.post()
-				.uri(serviceServerIp + ":" +serviceServerPort + "/api/streams/" + stream.getStreamerId() + "/offair")
-				.retrieve()
-				.bodyToMono(Boolean.class)
-				.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
-				.doOnError(e -> log.info(e.getMessage()))
-				.onErrorReturn(Boolean.FALSE)
-				.subscribeOn(Schedulers.parallel())
-				.subscribe((s) -> {
-					if (s) {
-						log.info("방송이 종료됩니다.");
-					} else {
-						log.info("ContentService 서버와 통신 에러 발생");
+
+			Mono<Boolean> offAirToServiceMono =requestOffAirToServiceServer(stream).subscribeOn(Schedulers.parallel());
+			Mono<Boolean> offAirToTranscodingMono = requestOffAirToTranscodingServer(stream).subscribeOn(Schedulers.parallel());
+
+			Mono.zip(offAirToServiceMono, offAirToTranscodingMono)
+				.subscribe(tuple -> {
+					boolean serviceSuccess = tuple.getT1();
+					boolean transcodingSuccess = tuple.getT2();
+					log.info(stream.getStreamerId() + " 의 방송 종료 감지");
+					if(!serviceSuccess){
+						log.error("서비스 서버와 통신 에러");
+					}
+					if(!transcodingSuccess){
+						log.error("트랜스코딩 서버와 통신 에러");
 					}
 				});
+
 			stream.closeStream();
 			context.deleteStream(stream.getStreamerId());
 			ctx.close();
@@ -241,6 +250,30 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 			log.info("Subscriber closed stream");
 		}
 	}
+
+	private Mono<Boolean> requestOffAirToTranscodingServer(Stream stream) {
+		return webClient.get()
+			.uri(transcodingServerIp + ":" + transcodingServerPort + "/transcode/" + stream.getStreamerId() +"/offair")
+			.retrieve()
+			.bodyToMono(Boolean.class)
+			.log()
+			.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
+			.doOnError(e -> log.info(e.getMessage()))
+			.onErrorReturn(Boolean.FALSE);
+	}
+
+	private Mono<Boolean> requestOffAirToServiceServer(Stream stream) {
+		return webClient.post()
+			.uri(serviceServerIp + ":" + serviceServerPort + "/api/streams/" + stream.getStreamerId() + "/offair")
+			.retrieve()
+			.bodyToMono(Boolean.class)
+			.log()
+			.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
+			.doOnError(e -> log.info(e.getMessage()))
+			.onErrorReturn(Boolean.FALSE);
+	}
+
+	// private
 
 	// RtmpConstants.RTMP_MSG_COMMAND_TYPE_AMF0 명령어가 deleteStream 때 수행하는 메서드
 	private void onDelete(ChannelHandlerContext ctx) {

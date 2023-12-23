@@ -29,6 +29,7 @@ public class Amf0Rules {
 		UNDEFINED(0x06),
 		// Java map
 		ECMA_ARRAY(0x08),
+		OBJECT_END(0x09),
 		// Java object array
 		STRICT_ARRAY(0x0A),
 		DATE(0x0B),
@@ -74,6 +75,7 @@ public class Amf0Rules {
 				case 0x05 -> NULL;
 				case 0x06 -> UNDEFINED;
 				case 0x08 -> ECMA_ARRAY;
+				case 0x09 -> OBJECT_END;
 				case 0x0A -> STRICT_ARRAY;
 				case 0x0B -> DATE;
 				case 0x0C -> LONG_STRING;

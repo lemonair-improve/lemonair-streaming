@@ -31,6 +31,7 @@ public class InboundConnectionLogger extends ChannelInboundHandlerAdapter {
 	@Override
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
 		log.info("Channel id {} with address {} is inactive", ctx.channel().id(), ctx.channel().remoteAddress());
+		// TODO: 2023-12-22 시간을 Stream에 사용하는듯
 		Duration duration = Duration.between(connectionTime, LocalDateTime.now());
 		long hours = duration.toHours();
 		long minutes = duration.toMinutesPart();

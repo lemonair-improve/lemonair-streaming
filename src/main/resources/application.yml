@@ -3,5 +3,3 @@ spring:
     group:
       deploy:
       local:
-    include:
-      - common
