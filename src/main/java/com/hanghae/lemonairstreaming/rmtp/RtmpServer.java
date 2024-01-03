@@ -85,18 +85,18 @@ public abstract class RtmpServer implements CommandLineRunner {
 				.doOnError((e) -> log.error("지원하지 않는 스트림 데이터 형식입니다. obs studio를 사용하세요"))
 				.onErrorComplete()
 				.flatMap(stream -> { // 각 스트림 객체에 대한 연산
-					return webClient
-						.post()
-						.uri(serviceServerHost+ "/api/streams/" + stream.getStreamerId() + "/check")
+					return webClient.post()
+						.uri(serviceServerHost + "/api/streams/" + stream.getStreamerId() + "/check")
 						.body(Mono.just(new StreamKey(stream.getStreamKey())), StreamKey.class)
 						.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
 						.retrieve()
-						.bodyToMono(Boolean.class).log()
+						.bodyToMono(Boolean.class)
+						.log()
 						.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
 						.doOnError(error -> log.info(error.getMessage()))
 						.onErrorReturn(Boolean.FALSE)
-						.filter(isStreamKeyValid-> isStreamKeyValid)
-						.flatMap(isStreamKeyValid->{
+						.filter(isStreamKeyValid -> isStreamKeyValid)
+						.flatMap(isStreamKeyValid -> {
 							log.info("스트리머 {} 의 stream key가 유효합니다.", stream.getStreamerId());
 							stream.sendPublishMessage();
 							requestTranscoding(stream);
@@ -109,10 +109,9 @@ public abstract class RtmpServer implements CommandLineRunner {
 	}
 
 	private CompletableFuture<Void> requestTranscoding(Stream stream) {
-		return stream.getReadyToBroadcast()
-			.thenRun(() ->
-
-				webClient // 스트림이 방송을 시작할 준비가 되었을 때 실행, webClient를 이용하여 비동기 get 요청
+		return stream.getReadyToBroadcast().thenRun(() -> {
+			log.info("트랜스코딩 서버 ip, port {},{}", transcodingServerIp, transcodingServerPort);
+			webClient // 스트림이 방송을 시작할 준비가 되었을 때 실행, webClient를 이용하여 비동기 get 요청
 				.get()
 				.uri(transcodingServerIp + ":" + transcodingServerPort + "/transcode/"
 					+ stream.getStreamerId()) // get요청을 보내는 uri
@@ -122,7 +121,9 @@ public abstract class RtmpServer implements CommandLineRunner {
 				.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(1000))) // 재시도 로직
 				.doOnError(error -> log.info("Transcoding 서버에서 다음의 에러가 발생했습니다 : " + error.getMessage()))
 				.onErrorComplete() // 에러가 발생해도 무시하고 onComplete 메서드 실행
-				.subscribe((ffmpegProcessPid) -> sendStreamingIsReadyToServiceServer(stream, ffmpegProcessPid)));
+				.subscribe((ffmpegProcessPid) -> sendStreamingIsReadyToServiceServer(stream, ffmpegProcessPid));
+		});
+
 	}
 
 	private void sendStreamingIsReadyToServiceServer(Stream stream, Long ffmpegProcessPid) {
@@ -131,8 +132,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 			.uri(serviceServerHost + "/api/streams/" + stream.getStreamerId() + "/onair") // post 요청 uri (컨텐츠 서버)
 			.retrieve() // 응답 수신
 			.bodyToMono(Boolean.class) // 응답 형변환 (Boolean)
-			.log()
-			.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500))) // 재시도
+			.log().retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500))) // 재시도
 			.doOnError(e -> log.info(e.getMessage())) // 에러 정의
 			.onErrorReturn(Boolean.FALSE) // 에러 발생 시 스트림의 종료를 방지
 			.subscribeOn(Schedulers.parallel()) // contents 서버를 구독하는 작업이 병렬 스레드에서 실행되도록 설정(비동기적 실행, 기존 스레드를 차단하지 않음)
