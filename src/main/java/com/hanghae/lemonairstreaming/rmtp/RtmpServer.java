@@ -46,11 +46,8 @@ public abstract class RtmpServer implements CommandLineRunner {
 	@Value("${external.transcoding.server.port}")
 	private int transcodingServerPort;
 
-	@Value("${external.service.server.ip}")
-	private String serviceServerIp;
-
-	@Value("${external.service.server.port}")
-	private int serviceServerPort;
+	@Value("${external.service.server.host}")
+	private String serviceServerHost;
 
 	@Value("${internal.rtmp.server.port}")
 	private int rtmpPort;
@@ -90,7 +87,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 				.flatMap(stream -> { // 각 스트림 객체에 대한 연산
 					return webClient
 						.post()
-						.uri(serviceServerIp +":"+serviceServerPort+ "/api/streams/" + stream.getStreamerId() + "/check")
+						.uri(serviceServerHost+ "/api/streams/" + stream.getStreamerId() + "/check")
 						.body(Mono.just(new StreamKey(stream.getStreamKey())), StreamKey.class)
 						.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
 						.retrieve()
@@ -131,7 +128,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 	private void sendStreamingIsReadyToServiceServer(Stream stream, Long ffmpegProcessPid) {
 		log.info("ffmpeg Process pid : " + ffmpegProcessPid);
 		webClient.post() // 비동기 post 요청
-			.uri(serviceServerIp+":"+serviceServerPort + "/api/streams/" + stream.getStreamerId() + "/onair") // post 요청 uri (컨텐츠 서버)
+			.uri(serviceServerHost + "/api/streams/" + stream.getStreamerId() + "/onair") // post 요청 uri (컨텐츠 서버)
 			.retrieve() // 응답 수신
 			.bodyToMono(Boolean.class) // 응답 형변환 (Boolean)
 			.log()
