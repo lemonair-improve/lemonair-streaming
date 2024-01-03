@@ -33,11 +33,8 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 	WebClient webClient;
 	private String currentSessionStream;
 
-	@Value("${external.service.server.ip}")
-	private String serviceServerIp;
-
-	@Value("${external.service.server.port}")
-	private int serviceServerPort;
+	@Value("${external.service.server.host}")
+	private String serviceServerHost;
 
 	// MSA 관련 설정
 	@Value("${external.transcoding.server.ip}")
@@ -264,7 +261,7 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 
 	private Mono<Boolean> requestOffAirToServiceServer(Stream stream) {
 		return webClient.post()
-			.uri(serviceServerIp + ":" + serviceServerPort + "/api/streams/" + stream.getStreamerId() + "/offair")
+			.uri(serviceServerHost + "/api/streams/" + stream.getStreamerId() + "/offair")
 			.retrieve()
 			.bodyToMono(Boolean.class)
 			.log()
