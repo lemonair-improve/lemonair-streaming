@@ -35,11 +35,9 @@ import reactor.util.retry.Retry;
 @Slf4j
 public abstract class RtmpServer implements CommandLineRunner {
 
-	// WebFlux에서 제공하는 비동기 HTTP 클라이언트
 	@Autowired
 	private WebClient webClient;
 
-	// MSA 관련 설정
 	@Value("${external.transcoding.server.ip}")
 	private String transcodingServerIp;
 
@@ -68,23 +66,22 @@ public abstract class RtmpServer implements CommandLineRunner {
 	}
 
 	private void runWithExtractedMethod(String... args) {
-		// Netty Server Bootstrap 정의
-		DisposableServer server = TcpServer.create() // TCP 서버 생성
-			.port(rtmpPort) // RTMP 포트 설정 (1935)
-			.doOnBound(disposableServer -> log.info("RTMP 서버가 포트 {} 에서 시작됩니다.", disposableServer.port()))
-			.doOnConnection(connection -> connection // 각 연결에 대해 적용되는 핸들러 추가
-				.addHandlerLast(getInboundConnectionLogger())
+
+		DisposableServer server = TcpServer.create()
+			.port(rtmpPort)
+			.doOnBound(disposableServer -> log.info("tcp server created"))
+			.doOnConnection(connection -> connection.addHandlerLast(getInboundConnectionLogger())
 				.addHandlerLast(getHandshakeHandler())
 				.addHandlerLast(getChunkDecoder())
 				.addHandlerLast(getChunkEncoder())
 				.addHandlerLast(getRtmpMessageHandler()))
-			.option(ChannelOption.SO_BACKLOG, 128) // 서버 소켓에 대한 설정 (연결 대기열의 최대 길이를 128로 설정)
-			.childOption(ChannelOption.SO_KEEPALIVE, true) // TCP keep-alive 옵션 활성화
-			.handle((in, out) -> in.receiveObject() // 데이터 수신
-				.cast(Stream.class)// Stream으로 형변환
-				.doOnError((e) -> log.error("지원하지 않는 스트림 데이터 형식입니다. obs studio를 사용하세요"))
+			.option(ChannelOption.SO_BACKLOG, 128)
+			.childOption(ChannelOption.SO_KEEPALIVE, true)
+			.handle((in, out) -> in.receiveObject()
+				.cast(Stream.class)
+				.doOnError((e) -> log.error("Stream class 로 캐스팅 실패, 지원하지 않는 방송 송출 프로그램이거나 잘못된 요청"))
 				.onErrorComplete()
-				.flatMap(stream -> { // 각 스트림 객체에 대한 연산
+				.flatMap(stream -> {
 					return webClient.post()
 						.uri(serviceServerHost + "/api/streams/" + stream.getStreamerId() + "/check")
 						.body(Mono.just(new StreamKey(stream.getStreamKey())), StreamKey.class)
@@ -97,30 +94,27 @@ public abstract class RtmpServer implements CommandLineRunner {
 						.onErrorReturn(Boolean.FALSE)
 						.filter(isStreamKeyValid -> isStreamKeyValid)
 						.flatMap(isStreamKeyValid -> {
-							log.info("스트리머 {} 의 stream key가 유효합니다.", stream.getStreamerId());
+							log.info("스트리머: {} 스트림 키 검증 완료", stream.getStreamerId());
 							stream.sendPublishMessage();
 							requestTranscoding(stream);
 							return Mono.empty();
 						});
 				})
 				.then())
-			.bindNow(); // 서버의 환경 설정과 구독 관계 설정이 끝나면 서버가 BindNow된다.
-		server.onDispose().block(); // .block()으로 서버가 onDispose()되어 Mono가 반환될때까지 기다린다.
+			.bindNow();
+		server.onDispose().block();
 	}
 
 	private CompletableFuture<Void> requestTranscoding(Stream stream) {
 		return stream.getReadyToBroadcast().thenRun(() -> {
 			log.info("트랜스코딩 서버 ip, port {},{}", transcodingServerIp, transcodingServerPort);
-			webClient // 스트림이 방송을 시작할 준비가 되었을 때 실행, webClient를 이용하여 비동기 get 요청
-				.get()
-				.uri(transcodingServerIp + ":" + transcodingServerPort + "/transcode/"
-					+ stream.getStreamerId()) // get요청을 보내는 uri
-				.retrieve() // 응답 수신
-				// 응답이 정상적으로 오지 않는다면 트랜스코딩 서버에서 문제가 발생한 것임.
+			webClient.get()
+				.uri(transcodingServerIp + ":" + transcodingServerPort + "/transcode/" + stream.getStreamerId())
+				.retrieve()
 				.bodyToMono(Long.class)
-				.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(1000))) // 재시도 로직
-				.doOnError(error -> log.info("Transcoding 서버에서 다음의 에러가 발생했습니다 : " + error.getMessage()))
-				.onErrorComplete() // 에러가 발생해도 무시하고 onComplete 메서드 실행
+				.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(1000)))
+				.doOnError(error -> log.info("Transcoding 서버 연결 오류 " + error.getMessage()))
+				.onErrorComplete()
 				.subscribe((ffmpegProcessPid) -> sendStreamingIsReadyToServiceServer(stream, ffmpegProcessPid));
 		});
 
@@ -128,15 +122,16 @@ public abstract class RtmpServer implements CommandLineRunner {
 
 	private void sendStreamingIsReadyToServiceServer(Stream stream, Long ffmpegProcessPid) {
 		log.info("ffmpeg Process pid : " + ffmpegProcessPid);
-		webClient.post() // 비동기 post 요청
-			.uri(serviceServerHost + "/api/streams/" + stream.getStreamerId() + "/onair") // post 요청 uri (컨텐츠 서버)
-			.retrieve() // 응답 수신
-			.bodyToMono(Boolean.class) // 응답 형변환 (Boolean)
-			.log().retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500))) // 재시도
-			.doOnError(e -> log.info(e.getMessage())) // 에러 정의
-			.onErrorReturn(Boolean.FALSE) // 에러 발생 시 스트림의 종료를 방지
-			.subscribeOn(Schedulers.parallel()) // contents 서버를 구독하는 작업이 병렬 스레드에서 실행되도록 설정(비동기적 실행, 기존 스레드를 차단하지 않음)
-			.subscribe((t) -> { // 비동기 작업 콜백 로깅
+		webClient.post()
+			.uri(serviceServerHost + "/api/streams/" + stream.getStreamerId() + "/onair")
+			.retrieve()
+			.bodyToMono(Boolean.class)
+			.log()
+			.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
+			.doOnError(e -> log.info(e.getMessage()))
+			.onErrorReturn(Boolean.FALSE)
+			.subscribeOn(Schedulers.parallel())
+			.subscribe((t) -> {
 				if (t) {
 					log.info("방송이 시작됩니다.");
 				} else {

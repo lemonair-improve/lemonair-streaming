@@ -36,7 +36,6 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 	@Value("${external.service.server.host}")
 	private String serviceServerHost;
 
-	// MSA 관련 설정
 	@Value("${external.transcoding.server.ip}")
 	private String transcodingServerIp;
 
@@ -47,8 +46,6 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 		this.context = context;
 	}
 
-	// 핸들러가 제거될 때 호출
-	// 스트림의 퍼블리셔 아이디와 채널의 아이디가 같을 경우 스트림을 닫고 삭제
 	@Override
 	public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
 		Stream stream = context.getStream(currentSessionStream);
@@ -61,13 +58,10 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 		super.handlerRemoved(ctx);
 	}
 
-	// RTMP 프로토콜에서 받은 메시지를 디코딩하고 유형에 따라 처리
-	// COMMAND_TYPE_AMF0, DATA_TYPE_AMF0, AUDIO, VIDEO, EVENT
 	@Override
 	protected void decode(ChannelHandlerContext channelHandlerContext, RtmpMessage in, List<Object> out) {
 		short type = in.header().getType();
 		ByteBuf payload = in.payload();
-		// log.info("type : " + type);
 		switch (type) {
 			case RtmpConstants.RTMP_MSG_COMMAND_TYPE_AMF0 -> handleCommand(channelHandlerContext, payload, out);
 			case RtmpConstants.RTMP_MSG_DATA_TYPE_AMF0 -> handleData(payload);
@@ -76,13 +70,9 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 			case RtmpConstants.RTMP_MSG_USER_CONTROL_TYPE_EVENT -> handleEvent(in);
 			default -> log.info("Unsupported message/ Type id: {}", type);
 		}
-		// Clear ByteBUf
 		payload.release();
 	}
 
-	// RtmpConstants.RTMP_MSG_COMMAND_TYPE_AMF0 일 때 수행되는 메서드
-	// 명령어에 따라 분기 처리
-	// connect, createStream 등
 	private void handleCommand(ChannelHandlerContext ctx, ByteBuf payload, List<Object> out) {
 		List<Object> decoded = Amf0Rules.decodeAll(payload);
 		String command = (String)decoded.get(0);
@@ -98,8 +88,6 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 		}
 	}
 
-	// RtmpConstants.RTMP_MSG_COMMAND_TYPE_AMF0 명령어가 connect일 때 수행하는 메서드
-	// 연결을 처리하는 과정
 	private void onConnect(ChannelHandlerContext ctx, List<Object> message) {
 		log.info("Client connection from {}, channel id is {}", ctx.channel().remoteAddress(), ctx.channel().id());
 
@@ -116,16 +104,10 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 
 		this.currentSessionStream = app;
 
-		// window acknowledgement size
-		//log.info("Sending window ack size message");
 		ctx.writeAndFlush(MessageProvider.setWindowAcknowledgement(RtmpConstants.RTMP_DEFAULT_OUTPUT_ACK_SIZE));
 
-		// set peer bandwidth
-		//log.info("Sending set peer bandwidth message");
 		ctx.writeAndFlush(MessageProvider.setPeerBandwidth(RtmpConstants.RTMP_DEFAULT_OUTPUT_ACK_SIZE, 2));
 
-		// set chunk size
-		//log.info("Sending set chunk size message");
 		ctx.writeAndFlush(MessageProvider.setChunkSize(RtmpConstants.RTMP_DEFAULT_CHUNK_SIZE));
 
 		List<Object> result = new ArrayList<>();
@@ -141,32 +123,25 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 		info.put("objectEncoding", 0);
 
 		result.add("_result");
-		result.add(message.get(1)); //transaction id
+		result.add(message.get(1));
 		result.add(cmdObj);
 		result.add(info);
 
 		ctx.writeAndFlush(MessageProvider.commandMessage(result));
 	}
 
-	// RtmpConstants.RTMP_MSG_COMMAND_TYPE_AMF0 명령어가 createStream일 때 수행하는 메서드
-	// transaction ID와 stream ID를 포함해서 클라이언트에 반환
 	private void onCreate(ChannelHandlerContext ctx, List<Object> message) {
 		log.info("Create stream");
 
 		List<Object> result = new ArrayList<>();
 		result.add("_result");
-		result.add(message.get(1)); // transaction id
-		result.add(null); // properties
-		result.add(RtmpConstants.RTMP_DEFAULT_MESSAGE_STREAM_ID_VALUE); // stream id
+		result.add(message.get(1));
+		result.add(null);
+		result.add(RtmpConstants.RTMP_DEFAULT_MESSAGE_STREAM_ID_VALUE);
 
 		ctx.writeAndFlush(MessageProvider.commandMessage(result));
 	}
 
-	// RtmpConstants.RTMP_MSG_COMMAND_TYPE_AMF0 명령어가 publish 때 수행하는 메서드
-	// 스트리밍을 게시할 때 실행
-	// 스트리밍 유형이 live가 아니면 연결 종료
-	// 스트리밍 세션을 생성하고 클라이언트로부터 전달받은 비밀키를 설정
-	// 세션을 서버 컨텍스트에 추가하고, output (출력리스트)에 추가
 	private void onPublish(ChannelHandlerContext ctx, List<Object> message, List<Object> output) {
 		log.info("Stream publishing");
 		String streamType = (String)message.get(4);
@@ -181,14 +156,10 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 		stream.setPublisher(ctx.channel());
 		context.addStream(stream);
 
-		// Push stream further and handle everything(metadata, credentials, etc)
 		output.add(stream);
 	}
 
-	// RtmpConstants.RTMP_MSG_COMMAND_TYPE_AMF0 명령어가 play일 때 수행하는 메서드
-	// 시청자 입장일 때 수행하는 메서드
 	private void onPlay(ChannelHandlerContext ctx, List<Object> message) {
-		// String secret = (String) message.get(3);
 
 		Stream stream = context.getStream(currentSessionStream);
 		if (stream != null) {
@@ -215,8 +186,6 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 		}
 	}
 
-	// RtmpConstants.RTMP_MSG_COMMAND_TYPE_AMF0 명령어가 closeStream 때 수행하는 메서드
-	// 스트리밍이 종료될 때 호출
 	private void onClose(ChannelHandlerContext ctx) {
 		Stream stream = context.getStream(currentSessionStream);
 		if (stream == null) {
@@ -224,21 +193,21 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 		} else if (ctx.channel().id().equals(stream.getPublisher().id())) {
 			ctx.writeAndFlush(MessageProvider.onStatus("status", "NetStream.Unpublish.Success", "Stop publishing"));
 
-			Mono<Boolean> offAirToServiceMono =requestOffAirToServiceServer(stream).subscribeOn(Schedulers.parallel());
-			Mono<Boolean> offAirToTranscodingMono = requestOffAirToTranscodingServer(stream).subscribeOn(Schedulers.parallel());
+			Mono<Boolean> offAirToServiceMono = requestOffAirToServiceServer(stream).subscribeOn(Schedulers.parallel());
+			Mono<Boolean> offAirToTranscodingMono = requestOffAirToTranscodingServer(stream).subscribeOn(
+				Schedulers.parallel());
 
-			Mono.zip(offAirToServiceMono, offAirToTranscodingMono)
-				.subscribe(tuple -> {
-					boolean serviceSuccess = tuple.getT1();
-					boolean transcodingSuccess = tuple.getT2();
-					log.info(stream.getStreamerId() + " 의 방송 종료 감지");
-					if(!serviceSuccess){
-						log.error("서비스 서버와 통신 에러");
-					}
-					if(!transcodingSuccess){
-						log.error("트랜스코딩 서버와 통신 에러");
-					}
-				});
+			Mono.zip(offAirToServiceMono, offAirToTranscodingMono).subscribe(tuple -> {
+				boolean serviceSuccess = tuple.getT1();
+				boolean transcodingSuccess = tuple.getT2();
+				log.info(stream.getStreamerId() + " 의 방송 종료 감지");
+				if (!serviceSuccess) {
+					log.error("서비스 서버와 통신 에러");
+				}
+				if (!transcodingSuccess) {
+					log.error("트랜스코딩 서버와 통신 에러");
+				}
+			});
 
 			stream.closeStream();
 			context.deleteStream(stream.getStreamerId());
@@ -250,7 +219,7 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 
 	private Mono<Boolean> requestOffAirToTranscodingServer(Stream stream) {
 		return webClient.get()
-			.uri(transcodingServerIp + ":" + transcodingServerPort + "/transcode/" + stream.getStreamerId() +"/offair")
+			.uri(transcodingServerIp + ":" + transcodingServerPort + "/transcode/" + stream.getStreamerId() + "/offair")
 			.retrieve()
 			.bodyToMono(Boolean.class)
 			.log()
@@ -270,22 +239,15 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 			.onErrorReturn(Boolean.FALSE);
 	}
 
-	// private
-
-	// RtmpConstants.RTMP_MSG_COMMAND_TYPE_AMF0 명령어가 deleteStream 때 수행하는 메서드
 	private void onDelete(ChannelHandlerContext ctx) {
 		onClose(ctx);
 	}
 
-	// 데이터 처리 메서드
-
-	// OBS 클라이언트를 감지하여 스트리밍의 메타데이터를 업데이트
-	// Youtube 스트리밍을 추가하려면 이 로직을 참고해야 할 듯
 	private void handleData(ByteBuf payload) {
 		List<Object> decoded = Amf0Rules.decodeAll(payload);
 		String dataType = (String)decoded.get(0);
 		if ("@setDataFrame".equals(dataType)) {
-			// handle metadata
+
 			Map<String, Object> metadata = (Map<String, Object>)decoded.get(2);
 			metadata.remove("filesize");
 			String encoder = (String)metadata.get("encoder");
@@ -300,7 +262,6 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 		}
 	}
 
-	// 스트림에 미디어 메시지(Video, Audio) 추가
 	private void handleMedia(RtmpMessage message) {
 		Stream stream = context.getStream(currentSessionStream);
 		if (stream != null) {
@@ -310,7 +271,6 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 		}
 	}
 
-	// 기타 이벤트에 대한 처리
 	private void handleEvent(RtmpMessage message) {
 		log.info("User event type {}, value {}", message.payload().readShort(), message.payload().readInt());
 	}

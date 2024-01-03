@@ -1,9 +1,5 @@
 package com.hanghae.lemonairstreaming.Handler;
 
-// import com.example.streamingservice.rtmp.model.messages.RtmpHeader;
-// import com.example.streamingservice.rtmp.model.messages.RtmpMessage;
-// import com.example.streamingservice.rtmp.model.util.MessageProvider;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,25 +18,18 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 
+	private final Map<Integer, RtmpHeader> completeHeaders = new HashMap<>();
+	private final Map<Integer, ByteBuf> payloadParts = new HashMap<>(4);
 	private int clientChunkSize = RtmpConstants.RTMP_DEFAULT_CHUNK_SIZE;
 	private int ackSize;
 	private int bytesReceived;
 	private int lastResponseSize;
-
-	private final Map<Integer, RtmpHeader> completeHeaders = new HashMap<>();
-	private final Map<Integer, ByteBuf> payloadParts = new HashMap<>(4);
-
 	private RtmpHeader currentHeader;
 	private ByteBuf currentPayload;
 
-	public enum DecodeState {
-		READ_HEADER, PROCESS_HEADER, PROCESS_PAYLOAD
-	}
-
-	// RTMP 프로토콜로 들어온 스트림을 디코딩
 	@Override
-	protected void decode(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, List<Object> out) throws Exception {
-		// log.info("디코딩 시작");
+	protected void decode(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, List<Object> out) throws
+		Exception {
 		DecodeState state = state();
 		if (state == null) {
 			state = DecodeState.READ_HEADER;
@@ -48,13 +37,11 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 
 		switch (state) {
 			case READ_HEADER -> {
-				// log.info("READ_HEADER state");
 				currentHeader = readHeader(byteBuf);
 				restoreHeader(currentHeader);
 				checkpoint(DecodeState.PROCESS_HEADER);
 			}
 			case PROCESS_HEADER -> {
-				// log.info("PROCESS_HEADER state");
 				int messageLength = currentHeader.getMessageLength();
 
 				if (currentHeader.getFmt() != RtmpConstants.RTMP_CHUNK_TYPE_3) {
@@ -62,7 +49,7 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 					payloadParts.put(currentHeader.getCid(), buf);
 					completeHeaders.put(currentHeader.getCid(), currentHeader);
 				}
-				// Rare case when format 3 encoding is used and body completely read
+
 				payloadParts.putIfAbsent(currentHeader.getCid(), Unpooled.buffer(messageLength, messageLength));
 
 				currentPayload = payloadParts.get(currentHeader.getCid());
@@ -70,7 +57,6 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 				checkpoint(DecodeState.PROCESS_PAYLOAD);
 			}
 			case PROCESS_PAYLOAD -> {
-				// log.info("PROCESS_PAYLOAD state");
 				byte[] bytes = new byte[Math.min(clientChunkSize, currentPayload.writableBytes())];
 				byteBuf.readBytes(bytes);
 				currentPayload.writeBytes(bytes);
@@ -84,11 +70,13 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 
 				RtmpMessage message = new RtmpMessage(currentHeader, currentPayload);
 
-				sendAcknowledgement(channelHandlerContext, currentHeader.getHeaderLength() + currentHeader.getMessageLength());
+				sendAcknowledgement(channelHandlerContext,
+					currentHeader.getHeaderLength() + currentHeader.getMessageLength());
 
 				switch (currentHeader.getType()) {
 					case RtmpConstants.RTMP_MSG_CONTROL_TYPE_SET_CHUNK_SIZE -> handleChunkSize(currentPayload);
-					case RtmpConstants.RTMP_MSG_CONTROL_TYPE_WINDOW_ACKNOWLEDGEMENT_SIZE -> handleWindowAckSize(currentPayload);
+					case RtmpConstants.RTMP_MSG_CONTROL_TYPE_WINDOW_ACKNOWLEDGEMENT_SIZE ->
+						handleWindowAckSize(currentPayload);
 					case RtmpConstants.RTMP_MSG_CONTROL_TYPE_ACKNOWLEDGEMENT -> handleAck(currentPayload);
 					case RtmpConstants.RTMP_MSG_CONTROL_TYPE_ABORT -> handleAbort(currentPayload);
 					default -> out.add(message);
@@ -97,7 +85,6 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		}
 	}
 
-	// RTMP 스트림의 헤더를 읽는 작업
 	private RtmpHeader readHeader(ByteBuf buf) {
 
 		RtmpHeader header = new RtmpHeader();
@@ -105,16 +92,13 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		byte firstByte = buf.readByte();
 		headerLength++;
 
-		// Decode Basic Header
 		int fmt = (firstByte & 0xff) >> 6;
 		int cid = firstByte & 0x3f;
 
 		if (cid == 0) {
-			// 2 byte form
 			cid = buf.readByte() & 0xff + 64;
 			headerLength++;
 		} else if (cid == 1) {
-			// 3 byte form
 			byte secondByte = buf.readByte();
 			byte thirdByte = buf.readByte();
 			cid = (thirdByte & 0xff) * 256 + (secondByte & 0xff) + 64;
@@ -124,18 +108,13 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		header.setCid(cid);
 		header.setFmt(fmt);
 
-		// Read Message Header
-		// 해당 스트리머의 요청 헤더가 처음인 경우
 		switch (fmt) {
 			case RtmpConstants.RTMP_CHUNK_TYPE_0 -> {
-				// log.info("RTMP_CHUNK_TYPE_0");
 				int timestamp = buf.readMedium();
 				int messageLength = buf.readMedium();
-				short type = (short) (buf.readByte() & 0xff);
-				// This field occupies 4 bytes in the chunk header in little endian format.
+				short type = (short)(buf.readByte() & 0xff);
 				int messageStreamId = buf.readIntLE();
 				headerLength += 11;
-				// Presence of extended timestamp
 				if (timestamp == RtmpConstants.RTMP_MAX_TIMESTAMP) {
 					long extendedTimestamp = buf.readInt();
 					header.setExtendedTimestamp(extendedTimestamp);
@@ -147,15 +126,12 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 				header.setType(type);
 				header.setStreamId(messageStreamId);
 			}
-			// header type이 1인 경우 이전 헤더와 streamID가 같음
 			case RtmpConstants.RTMP_CHUNK_TYPE_1 -> {
-				// log.info("RTMP_CHUNK_TYPE_1");
 				int timestampDelta = buf.readMedium();
 				int messageLength = buf.readMedium();
-				short type = (short) (buf.readByte() & 0xff);
+				short type = (short)(buf.readByte() & 0xff);
 
 				headerLength += 7;
-				// Presence of extended timestamp
 				if (timestampDelta == RtmpConstants.RTMP_MAX_TIMESTAMP) {
 					long extendedTimestamp = buf.readInt();
 					header.setExtendedTimestamp(extendedTimestamp);
@@ -166,12 +142,9 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 				header.setMessageLength(messageLength);
 				header.setType(type);
 			}
-			// 영상의 길이가 32비트를 초과하는 경우
 			case RtmpConstants.RTMP_CHUNK_TYPE_2 -> {
-				// log.info("RTMP_CHUNK_TYPE_2");
 				int timestampDelta = buf.readMedium();
 				headerLength += 3;
-				// Presence of extended timestamp
 				if (timestampDelta == RtmpConstants.RTMP_MAX_TIMESTAMP) {
 					long extendedTimestamp = buf.readInt();
 					header.setExtendedTimestamp(extendedTimestamp);
@@ -180,14 +153,10 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 				header.setTimestampDelta(timestampDelta);
 
 			}
-            // header type이 3인 경우 이전 헤더와 동일한 경우로써 다른 작업이 필요하지 않음
 			case RtmpConstants.RTMP_CHUNK_TYPE_3 -> {
-				/* Do nothing */
-				// log.info("RTMP_CHUNK_TYPE_3");
 			}
 			default -> {
-				log.error("readHeader 함수에서 switch문에 걸리지 않음");
-				log.error("fmt :" + fmt);
+				log.error("not caught in format type switch :" + fmt);
 				throw new RuntimeException("Illegal format type");
 			}
 		}
@@ -196,7 +165,6 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		return header;
 	}
 
-	// 부분적으로 수신된 헤더를 복원하는 과정
 	private void restoreHeader(RtmpHeader header) {
 		int cid = header.getCid();
 		RtmpHeader completeHeader = completeHeaders.get(cid);
@@ -224,19 +192,8 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		}
 	}
 
-	/*
-	The client or the server MUST send an acknowledgment to the peer after receiving bytes equal to the window size.
-	The window size is the maximum number of bytes that the sender sends without receiving acknowledgment from the receiver.
-	This message specifies the sequence number, which is the number of the bytes received so far.
-		SEQUENCE NUMBER (32 bits): This field holds the number of bytes received so far.
-	*/
-
-	// RTMP 통신에서 Acknowledgement 역할 수행
-	// 수신한 바이트 수를 상대에게 알려줘서 트래픽을 조절하는 로직 수행
-	// 즉 수신 및 처리되는 데이터 양을 제어하는 로직
 	private void sendAcknowledgement(ChannelHandlerContext channelHandlerContext, int inSize) {
 		bytesReceived += inSize;
-		// handle overflow
 		if (bytesReceived > 0x70000000) {
 			channelHandlerContext.writeAndFlush(MessageProvider.acknowledgement(bytesReceived));
 			bytesReceived = 0;
@@ -250,29 +207,25 @@ public class ChunkDecoder extends ReplayingDecoder<ChunkDecoder.DecodeState> {
 		}
 	}
 
-	// payload에서 ackSize 값 받아오기
-	// 데이터 처리량을 제어하기 위한 값
 	private void handleWindowAckSize(ByteBuf payload) {
 		ackSize = payload.readInt();
 		payload.release();
 	}
 
-	// 데이터 전송의 크기를 결정하는 데 사용
 	private void handleChunkSize(ByteBuf payload) {
 		clientChunkSize = payload.readInt();
 		payload.release();
 	}
 
-	// ACK 메시지를 받고 처리하는 로직
-	// 특별한 처리를 하지 않고 payload만 해제
 	private void handleAck(ByteBuf payload) {
 		payload.release();
 	}
 
-	// 데이터 스트림을 중단하는 로직
-	// 일반적으로 Abort 메시지는 연결 종료 혹은 데이터 스트림을 중단하기 위해 사용
-	// 특별한 처리를 하지 않고 payload만 해제
 	private void handleAbort(ByteBuf payload) {
 		payload.release();
+	}
+
+	public enum DecodeState {
+		READ_HEADER, PROCESS_HEADER, PROCESS_PAYLOAD
 	}
 }
