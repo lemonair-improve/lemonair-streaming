@@ -21,82 +21,50 @@ public class HandshakeHandler extends ByteToMessageDecoder {
 	private byte[] clientBytes = new byte[RtmpConstants.RTMP_HANDSHAKE_SIZE - 8];
 
 	@Override
-	protected void decode(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, List<Object> list) throws
-		Exception {
+	protected void decode(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, List<Object> list) {
 		if (completed) {
-			// Continue pipeline
 			channelHandlerContext.fireChannelRead(byteBuf);
 			return;
 		}
 
-		// 청크2개 검사
-		// 클라이언트 측의 청크를 2번 받아서 연결에 이상이 없는지 확인하고
-		// 서버 측에서 클라이언트에 대한 응답을 S1S2S3으로 생성하여 확인한다
 		if (!C0C1) {
-			// C0
-			//read version
 			byte version = byteBuf.readByte();
 			if (!(version == RtmpConstants.RTMP_VERSION)) {
-				// 현재 version이 71로 넘어온다.
 				log.info("Client requests unsupported version: " + version);
 			}
-			// C1
-			// read timestamp
 			timestamp = byteBuf.readInt();
-			// read zero
 			byteBuf.readInt();
-			// read random bytes
 			byteBuf.readBytes(clientBytes);
 
 			generateS0S1S2(channelHandlerContext);
 			C0C1 = true;
-		} else /* Read C2 */ {
-			// C2
-			// read timestamp
+		} else {
 			byteBuf.readInt();
-			// read zero
 			byteBuf.readInt();
-			// read random bytes
 			byteBuf.readBytes(clientBytes);
 
-			// Clear buffer
 			clientBytes = null;
 			completed = true;
-			// Handshake is completed. Remove this handler from the pipeline
 			channelHandlerContext.channel().pipeline().remove(this);
 		}
 	}
 
-	// S0 - RTMP 버전 정보
-	// S1 - C1의 타임스탬프를 0으로 설정, 0으로 채워진 4바이트와 랜덤한 1528 바이트 생성
-	// S2 - C1의 타임 스탬프를 그대로 사용, 0으로 채워진 4바이트와 랜덤한 1528 바이트 생성
 	private void generateS0S1S2(ChannelHandlerContext channelHandlerContext) {
-		ByteBuf resp = Unpooled.buffer(RtmpConstants.RTMP_HANDSHAKE_VERSION_LENGTH
-			+ RtmpConstants.RTMP_HANDSHAKE_SIZE + RtmpConstants.RTMP_HANDSHAKE_SIZE);
-
-		// S0
+		ByteBuf resp = Unpooled.buffer(RtmpConstants.RTMP_HANDSHAKE_VERSION_LENGTH + RtmpConstants.RTMP_HANDSHAKE_SIZE
+			+ RtmpConstants.RTMP_HANDSHAKE_SIZE);
 		resp.writeByte(RtmpConstants.RTMP_VERSION);
 
-		// S1
-		// Write timestamp, always zero
 		resp.writeInt(0);
-		// Write zero
 		resp.writeInt(0);
-		// Write random 1528 bytes
 		resp.writeBytes(randomBytes(RtmpConstants.RTMP_HANDSHAKE_SIZE - 8));
 
-		// S2
-		// Write timestamp
 		resp.writeInt(timestamp);
-		// Write zero
 		resp.writeInt(0);
-		// Write random 1528 bytes
 		resp.writeBytes(randomBytes(RtmpConstants.RTMP_HANDSHAKE_SIZE - 8));
 
 		channelHandlerContext.writeAndFlush(resp);
 	}
 
-	// Placeholder method. For production use java.security.SecureRandom
 	private byte[] randomBytes(int length) {
 		byte[] bytes = new byte[length];
 		new Random().nextBytes(bytes);

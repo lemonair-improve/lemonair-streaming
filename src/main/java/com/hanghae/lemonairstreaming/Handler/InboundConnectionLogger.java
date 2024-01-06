@@ -1,50 +1,29 @@
 package com.hanghae.lemonairstreaming.Handler;
 
 import java.net.SocketException;
-import java.time.Duration;
-import java.time.LocalDateTime;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import lombok.extern.slf4j.Slf4j;
 
-@Slf4j(topic = "InboundConnectionLogger")
+@Slf4j
 public class InboundConnectionLogger extends ChannelInboundHandlerAdapter {
 
-	LocalDateTime connectionTime = LocalDateTime.now();
-
-	// 여기서 channel은 Socket의 채널을 의미
-
-	/*
-	channel이 활성화 상태인 경우에 로그 기록
-	 */
 	@Override
-	public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+	public void handlerAdded(ChannelHandlerContext ctx) {
 		if (ctx.channel().isActive()) {
-			log.info("Channel is active. Address: " + ctx.channel().remoteAddress() + " .Channel id is: " + ctx.channel().id());
+			log.info("채널 시작");
 		}
 	}
 
-	/*
-	channel 비활성화된 상태일 때 로그 기록
-	 */
 	@Override
-	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-		log.info("Channel id {} with address {} is inactive", ctx.channel().id(), ctx.channel().remoteAddress());
-		Duration duration = Duration.between(connectionTime, LocalDateTime.now());
-		long hours = duration.toHours();
-		long minutes = duration.toMinutesPart();
-		long seconds = duration.toSecondsPart();
-		String time = hours + " hours, " + minutes + " minutes, " + seconds + " seconds";
-		log.info("Channel has been active for {}", time);
+	public void channelInactive(ChannelHandlerContext ctx) {
+		log.info("채널 종료");
 		ctx.fireChannelInactive();
 	}
 
-	/*
-	예외 발생
-	 */
 	@Override
-	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
 		if (cause instanceof SocketException) {
 			log.info("Socket closed");
 		} else {
