@@ -39,3 +39,4 @@ out/
 ### properties ###
 application-local.yml
 application-dev.yml
+application-deploy.yml

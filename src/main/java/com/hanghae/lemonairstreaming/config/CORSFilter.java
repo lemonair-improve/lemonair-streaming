@@ -10,7 +10,6 @@ import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import org.springframework.web.reactive.config.EnableWebFlux;
 
-//TODO: 2023-12-02 CORSFilter가 없으면 무슨 문제가 발생하는지 알아보기
 @Configuration
 @EnableWebFlux
 public class CORSFilter {

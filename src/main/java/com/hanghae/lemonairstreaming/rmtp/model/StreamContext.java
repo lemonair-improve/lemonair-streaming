@@ -19,10 +19,6 @@ public class StreamContext {
 	}
 
 	public Stream getStream(String streamName) {
-//		if (streamName == null) {
-//			return null;
-//		}
-//		return context.getOrDefault(streamName, null); // 왜 이렇게 했을까?
 		return (streamName != null) ? context.getOrDefault(streamName, null) : null;
 	}
 }
