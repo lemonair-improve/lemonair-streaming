@@ -124,7 +124,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 
 	private void createChattingRoom(Stream stream) {
 		webClient.post()
-			.uri(chatServerHost + "/chat/room/" + stream.getStreamerId())
+			.uri(chatServerHost + "/chat/rooms/" + stream.getStreamerId())
 			.retrieve()
 			.bodyToMono(Boolean.class)
 			.log()
