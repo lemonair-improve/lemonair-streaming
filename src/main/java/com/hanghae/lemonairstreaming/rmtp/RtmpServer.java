@@ -47,6 +47,9 @@ public abstract class RtmpServer implements CommandLineRunner {
 	@Value("${external.service.server.host}")
 	private String serviceServerHost;
 
+	@Value("${external.chat.server.host}")
+	private String chatServerHost;
+
 	@Value("${internal.rtmp.server.port}")
 	private int rtmpPort;
 
@@ -115,13 +118,30 @@ public abstract class RtmpServer implements CommandLineRunner {
 				.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(1000)))
 				.doOnError(error -> log.info("Transcoding 서버 연결 오류 " + error.getMessage()))
 				.onErrorComplete()
-				.subscribe((ffmpegProcessPid) -> sendStreamingIsReadyToServiceServer(stream, ffmpegProcessPid));
+				.subscribe((ffmpegProcessPid) -> createChattingRoom(stream));
 		});
-
 	}
 
-	private void sendStreamingIsReadyToServiceServer(Stream stream, Long ffmpegProcessPid) {
-		log.info("ffmpeg Process pid : " + ffmpegProcessPid);
+	private void createChattingRoom(Stream stream) {
+		webClient.post()
+			.uri(chatServerHost + "/chat/room/" + stream.getStreamerId())
+			.retrieve()
+			.bodyToMono(Boolean.class)
+			.log()
+			.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
+			.doOnError(e -> log.info(e.getMessage()))
+			.onErrorReturn(Boolean.FALSE)
+			.subscribeOn(Schedulers.parallel())
+			.onErrorComplete()
+			.subscribe(success -> {
+				if (success) {
+					log.info("채팅 서버에 채팅방 개설 완료");
+					sendStreamingIsReadyToServiceServer(stream);
+				}
+			});
+	}
+
+	private void sendStreamingIsReadyToServiceServer(Stream stream) {
 		webClient.post()
 			.uri(serviceServerHost + "/api/streams/" + stream.getStreamerId() + "/onair")
 			.retrieve()

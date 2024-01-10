@@ -21,6 +21,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageDecoder;
 import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.retry.Retry;
@@ -41,6 +42,9 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 
 	@Value("${external.transcoding.server.port}")
 	private int transcodingServerPort;
+
+	@Value("${external.chat.server.host}")
+	private String chatServerHost;
 
 	public RtmpMessageHandler(StreamContext context) {
 		this.context = context;
@@ -193,21 +197,32 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 		} else if (ctx.channel().id().equals(stream.getPublisher().id())) {
 			ctx.writeAndFlush(MessageProvider.onStatus("status", "NetStream.Unpublish.Success", "Stop publishing"));
 
-			Mono<Boolean> offAirToServiceMono = requestOffAirToServiceServer(stream).subscribeOn(Schedulers.parallel());
-			Mono<Boolean> offAirToTranscodingMono = requestOffAirToTranscodingServer(stream).subscribeOn(
-				Schedulers.parallel());
+			Mono<Boolean> offAirToServiceMono = requestOffAirToServiceServer(stream);
+			Mono<Boolean> offAirToTranscodingMono = requestOffAirToTranscodingServer(stream);
+			Mono<Boolean> removeChattingRoomMono = removeChattingRoom(stream);
 
-			Mono.zip(offAirToServiceMono, offAirToTranscodingMono).subscribe(tuple -> {
-				boolean serviceSuccess = tuple.getT1();
-				boolean transcodingSuccess = tuple.getT2();
-				log.info(stream.getStreamerId() + " 의 방송 종료 감지");
-				if (!serviceSuccess) {
-					log.error("서비스 서버와 통신 에러");
-				}
-				if (!transcodingSuccess) {
-					log.error("트랜스코딩 서버와 통신 에러");
-				}
-			});
+			Flux.merge(offAirToServiceMono, offAirToTranscodingMono, removeChattingRoomMono)
+				.subscribeOn(Schedulers.parallel())
+				.collectList()  // 결과를 List로 수집
+				.subscribe(results -> {
+					boolean serviceSuccess = results.get(0);
+					boolean transcodingSuccess = results.get(1);
+					boolean removeSuccess = results.get(2);
+
+					log.info(stream.getStreamerId() + " 의 방송 종료 감지");
+
+					if (!serviceSuccess) {
+						log.error("{}의 방송 서비스 서버와 통신 에러", stream.getStreamerId());
+					}
+
+					if (!transcodingSuccess) {
+						log.error("{}의 방송 트랜스코딩 서버와 통신 에러", stream.getStreamerId());
+					}
+
+					if (!removeSuccess) {
+						log.error("{}의 방송 채팅방 제거 에러", stream.getStreamerId());
+					}
+				});
 
 			stream.closeStream();
 			context.deleteStream(stream.getStreamerId());
@@ -231,6 +246,17 @@ public class RtmpMessageHandler extends MessageToMessageDecoder<RtmpMessage> {
 	private Mono<Boolean> requestOffAirToServiceServer(Stream stream) {
 		return webClient.post()
 			.uri(serviceServerHost + "/api/streams/" + stream.getStreamerId() + "/offair")
+			.retrieve()
+			.bodyToMono(Boolean.class)
+			.log()
+			.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
+			.doOnError(e -> log.info(e.getMessage()))
+			.onErrorReturn(Boolean.FALSE);
+	}
+
+	private Mono<Boolean> removeChattingRoom(Stream stream) {
+		return webClient.delete()
+			.uri(chatServerHost + "/chat/rooms/" + stream.getStreamerId())
 			.retrieve()
 			.bodyToMono(Boolean.class)
 			.log()
