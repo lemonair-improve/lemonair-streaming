@@ -15,7 +15,7 @@ https://youtu.be/gUTpnhFRUK8
 
 ## | Service Architecture ⚙
 
-![lemonair-architecture](https://github.com/lem-onair/lemonair-FE/assets/121735319/7d3d66d5-c6d6-4dc6-8906-2e92cd83212c)
+![lemonair-architecture](https://github.com/lem-onair/lemonair-transcoding/assets/93697934/894eb85c-7c6a-4c60-a01a-d5547a41440a)
 
 ## | Sequence Diagram 🔄
 
