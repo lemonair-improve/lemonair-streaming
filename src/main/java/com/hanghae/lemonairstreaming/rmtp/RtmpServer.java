@@ -1,5 +1,7 @@
 package com.hanghae.lemonairstreaming.rmtp;
 
+import static com.hanghae.lemonairstreaming.util.ThreadSchedulers.*;
+
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
@@ -81,25 +83,20 @@ public abstract class RtmpServer implements CommandLineRunner {
 				.cast(Stream.class)
 				.doOnError((e) -> log.error("Stream class 로 캐스팅 실패, 지원하지 않는 방송 송출 프로그램이거나 잘못된 요청"))
 				.onErrorComplete()
-				.flatMap(stream -> {
-					return webClient.post()
-						.uri(serviceServerHost + "/api/streams/" + stream.getStreamerId() + "/check")
-						.body(Mono.just(new StreamKey(stream.getStreamKey())), StreamKey.class)
-						.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-						.retrieve()
-						.bodyToMono(Boolean.class)
-						.log()
-						.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
-						.doOnError(error -> log.info(error.getMessage()))
-						.onErrorReturn(Boolean.FALSE)
-						.filter(isStreamKeyValid -> isStreamKeyValid)
-						.flatMap(isStreamKeyValid -> {
-							log.info("스트리머: {} 스트림 키 검증 완료", stream.getStreamerId());
-							stream.sendPublishMessage();
-							requestTranscoding(stream);
-							return Mono.empty();
-						});
-				})
+				.flatMap(stream -> webClient.post()
+					.uri(serviceServerHost + "/api/streams/" + stream.getStreamerId() + "/check")
+					.body(Mono.just(new StreamKey(stream.getStreamKey())), StreamKey.class)
+					.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+					.retrieve()
+					.bodyToMono(Boolean.class)
+					.log("service서버에 스트림키 검증")
+					.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
+					.subscribeOn(IO.scheduler())
+					.doOnError(error -> log.info(error.getMessage()))
+					.onErrorReturn(Boolean.FALSE)
+					.filter(isStreamKeyValid -> isStreamKeyValid)
+					.doOnSuccess((valid) -> stream.sendPublishMessage())
+					.then(Mono.fromFuture(requestTranscoding(stream))))
 				.then())
 			.bindNow();
 		server.onDispose().block();
@@ -107,36 +104,32 @@ public abstract class RtmpServer implements CommandLineRunner {
 
 	private CompletableFuture<Void> requestTranscoding(Stream stream) {
 		return stream.getReadyToBroadcast().thenRun(() -> {
-			log.info("트랜스코딩 서버 ip, port {},{}", transcodingServerIp, transcodingServerPort);
 			webClient.get()
 				.uri(transcodingServerIp + ":" + transcodingServerPort + "/transcode/" + stream.getStreamerId())
 				.retrieve()
 				.bodyToMono(Long.class)
 				.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(1000)))
-				.doOnError(error -> log.info("Transcoding 서버 연결 오류 " + error.getMessage()))
+				.doOnError(error -> log.error("Transcoding 서버 연결 오류 " + error.getMessage()))
 				.onErrorComplete()
-				.subscribe((ffmpegProcessPid) -> sendStreamingIsReadyToServiceServer(stream, ffmpegProcessPid));
+				.log("Transcoding 서버에 영상 변환 요청")
+				.subscribeOn(IO.scheduler())
+				.then(sendStreamingIsReadyToServiceServer(stream))
+				.subscribe();
 		});
 
 	}
 
-	private void sendStreamingIsReadyToServiceServer(Stream stream, Long ffmpegProcessPid) {
-		log.info("ffmpeg Process pid : " + ffmpegProcessPid);
-		webClient.post()
+	private Mono<Void> sendStreamingIsReadyToServiceServer(Stream stream) {
+		return Mono.defer(() -> webClient.post()
 			.uri(serviceServerHost + "/api/streams/" + stream.getStreamerId() + "/onair")
 			.retrieve()
 			.bodyToMono(Boolean.class)
-			.log()
 			.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(500)))
-			.doOnError(e -> log.info(e.getMessage()))
+			.doOnError(e -> log.error(e.getMessage()))
 			.onErrorReturn(Boolean.FALSE)
-			.subscribeOn(Schedulers.parallel())
-			.subscribe((t) -> {
-				if (t) {
-					log.info("방송이 시작됩니다.");
-				} else {
-					log.info("Service 서버와 통신 에러 발생");
-				}
-			});
+			.log("service 서버에 방송 시작 준비 완료 알림")
+			.subscribeOn(IO.scheduler())
+			.doOnSuccess(t -> log.info(stream.getStreamerId() + (t ? "방송이 시작되었습니다." : "방송이 시작되지 못했습니다.")))
+			.then());
 	}
 }
