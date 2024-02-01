@@ -107,7 +107,7 @@ public abstract class RtmpServer implements CommandLineRunner {
 			webClient.get()
 				.uri(transcodingServerIp + ":" + transcodingServerPort + "/transcode/" + stream.getStreamerId())
 				.retrieve()
-				.bodyToMono(Long.class)
+				.bodyToMono(Boolean.class)
 				.retryWhen(Retry.fixedDelay(3, Duration.ofMillis(1000)))
 				.doOnError(error -> log.error("Transcoding 서버 연결 오류 " + error.getMessage()))
 				.onErrorComplete()
